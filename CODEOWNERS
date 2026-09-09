@@ -1,0 +1,17 @@
+# services
+/services/web/           @<product-pos-dri>
+/services/pos/            @<product-pos-dri>
+/services/payments/       @<payments-dri>
+/services/commission/     @<payments-dri>
+/services/_shared/        @<platform-dri> @<payments-dri>
+
+# infra & delivery
+/infra/                   @<platform-dri>
+/.github/workflows/       @<platform-dri>
+
+# operations
+/docs/slo-error-budgets.md   @<reliability-dri>
+/docs/runbook.md              @<reliability-dri>
+
+# docs owned collectively — require at least one review
+/docs/                    @<platform-dri> @<reliability-dri>
