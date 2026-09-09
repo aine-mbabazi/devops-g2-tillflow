@@ -1,17 +1,17 @@
 # services
-/services/web/           @<product-pos-dri>
-/services/pos/            @<product-pos-dri>
-/services/payments/       @<payments-dri>
-/services/commission/     @<payments-dri>
-/services/_shared/        @<platform-dri> @<payments-dri>
+/services/web/            @aine-mbabazi
+/services/pos/             @aine-mbabazi
+/services/payments/        @cheshari-pearl
+/services/commission/      @cheshari-pearl
+/services/_shared/         @aine-mbabazi @cheshari-pearl
 
 # infra & delivery
-/infra/                   @<platform-dri>
-/.github/workflows/       @<platform-dri>
+/infra/                    @aine-mbabazi
+/.github/workflows/        @aine-mbabazi
 
 # operations
-/docs/slo-error-budgets.md   @<reliability-dri>
-/docs/runbook.md              @<reliability-dri>
+/docs/slo-error-budgets.md   @cheshari-pearl
+/docs/runbook.md              @cheshari-pearl
 
 # docs owned collectively — require at least one review
-/docs/                    @<platform-dri> @<reliability-dri>
+/docs/                     @aine-mbabazi @cheshari-pearl
