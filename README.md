@@ -68,6 +68,7 @@ provisioned or torn down, to avoid unnecessary AWS charges.)_
 
 - [`docs/ownership.md`](docs/ownership.md) — ownership matrix
 - [`docs/architecture.md`](docs/architecture.md) — system architecture
+- [`docs/payment-contract.md`](docs/payment-contract.md) — proposed POS → Payments contract for G0 review
 - [`docs/adr/`](docs/adr/) — architecture decision records
 - [`docs/threat-model.md`](docs/threat-model.md) — threat model
 - [`docs/slo-error-budgets.md`](docs/slo-error-budgets.md) — SLOs and error budgets
