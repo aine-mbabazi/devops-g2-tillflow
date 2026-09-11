@@ -9,9 +9,11 @@
 /infra/                    @aine-mbabazi
 /.github/workflows/        @aine-mbabazi
 
+# Shared documentation; required review is configured in repository rules.
+/docs/                     @aine-mbabazi @cheshari-pearl
+
+# Specific rules follow the general docs rule because the last match wins.
 # operations
 /docs/slo-error-budgets.md   @cheshari-pearl
 /docs/runbook.md              @cheshari-pearl
-
-# docs owned collectively — require at least one review
-/docs/                     @aine-mbabazi @cheshari-pearl
+/docs/scar-log.md             @cheshari-pearl
