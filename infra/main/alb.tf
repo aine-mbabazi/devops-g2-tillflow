@@ -1,24 +1,28 @@
 resource "aws_security_group" "alb" {
-  name        = "${local.name_prefix}-alb-sg"
+  name_prefix = "${local.name_prefix}-alb-sg-"
   description = "ALB security group - allows inbound HTTP from within VPC only"
   vpc_id      = aws_vpc.main.id
 
   ingress {
-    description = "HTTP from internet"
+    description = "HTTP from within VPC only"
     from_port   = 80
     to_port     = 80
     protocol    = "tcp"
-    cidr_blocks = [aws_vpc.main.cidr_block] 
+    cidr_blocks = [aws_vpc.main.cidr_block]
   }
 
   egress {
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
-    cidr_blocks = [aws_vpc.main.cidr_block] 
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
   tags = merge(local.common_tags, { Name = "${local.name_prefix}-alb-sg", service = "networking" })
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 resource "aws_lb" "main" {
