@@ -41,6 +41,10 @@ seconds for existing connections to close.
 - `src/app.js`: server factory; `GET /health` and `HEAD /health` are liveness
   checks only. They do not claim database or Daraja readiness. Other routes
   return `404`; unsupported health methods return `405`.
+- `POST /payments`: accepts a local payment attempt and requires an
+  `Idempotency-Key` header plus `tenant_id`, `sale_id`, `amount_minor`, `KES`,
+  and a normalized sandbox test phone. `GET /payments/{payment_id}` returns
+  the payment's current status.
 - `src/config.js`: validates runtime configuration.
 - `src/server.js`: wires dependencies, emits JSON logs, and handles shutdown.
   Request logs contain fixed route labels and status codes, not request bodies,
@@ -60,14 +64,12 @@ The fake Daraja client intentionally does not provide durable idempotency. It
 is an in-memory local test double, so its state is lost whenever the service
 restarts.
 
-The Payments API and database layer will own idempotency when payment endpoints
-are implemented. They will persist an idempotency key and request fingerprint,
-return the same payment attempt for an identical retry, reject a reused key
-with changed input, and prevent more than one pending or successful attempt per
-tenant sale.
+The API now enforces these rules through an in-memory store: an identical retry
+returns the same payment attempt, a reused key with changed input returns
+`409`, and a second pending or successful payment for one tenant sale returns
+`409`. The store is erased on restart; a PostgreSQL repository must enforce the
+same constraints durably.
 
-Next work: agree the POS contract and runtime, add authentication and tenant
-context, migrations and durable idempotency, then implement payment endpoints,
-Daraja **sandbox** integration, callbacks, reconciliation, and B2C. Container
-packaging and telemetry will be coordinated with Platform. No real-money mode
-is included.
+Next work: service authentication and tenant authorization, PostgreSQL
+migrations, Daraja **sandbox** integration, callbacks, reconciliation, B2C,
+telemetry, and container packaging. No real-money mode is included.
