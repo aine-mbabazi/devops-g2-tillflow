@@ -54,6 +54,18 @@ The fake client is instantiated at startup for later handler wiring. It is not
 exposed over HTTP; it has no persistence or durable idempotency guarantees.
 Use synthetic data only. A fresh instance starts empty.
 
+## Idempotency boundary
+
+The fake Daraja client intentionally does not provide durable idempotency. It
+is an in-memory local test double, so its state is lost whenever the service
+restarts.
+
+The Payments API and database layer will own idempotency when payment endpoints
+are implemented. They will persist an idempotency key and request fingerprint,
+return the same payment attempt for an identical retry, reject a reused key
+with changed input, and prevent more than one pending or successful attempt per
+tenant sale.
+
 Next work: agree the POS contract and runtime, add authentication and tenant
 context, migrations and durable idempotency, then implement payment endpoints,
 Daraja **sandbox** integration, callbacks, reconciliation, and B2C. Container
