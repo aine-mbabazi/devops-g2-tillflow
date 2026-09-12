@@ -110,9 +110,9 @@ will be validated during integration.
   stores a canonical request fingerprint. The same key with the same input
   returns the existing attempt; changed input returns `409`.
 - Payments enforces at most one pending or succeeded payout per Commission
-  ledger item. The ledger item must be identified by `tenant_id`,
-  `commission_run_id`, and `attendant_id`; Platform and Commission must agree
-  on the final database identifier before implementation.
+  ledger item. The ledger item is identified by the composite key
+  `(tenant_id, commission_run_id, attendant_id)`. This enforces one payout per
+  attendant per commission run by construction.
 - Commission uses the same ledger item and idempotency key on a job rerun. It
   must not create a new payout request merely because its process restarted.
 - Provider correlation IDs and processing outcomes are persisted. Callback
@@ -149,8 +149,6 @@ will be validated during integration.
 
 - Agree on endpoint names, payload fields, service authentication, and how
   verified tenant context reaches Payments.
-- Define the Commission ledger item's final identifier and whether one daily
-  run can intentionally create more than one payout per attendant.
 - Confirm the eligible-sales cutoff, commission-rate source, and daily close
   schedule for each tenant.
 - Validate Daraja sandbox B2C recipient, amount, callback, and transaction-query
