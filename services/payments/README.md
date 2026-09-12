@@ -30,11 +30,26 @@ No dependency installation, AWS resources, database, or credentials are needed.
 | `HOST` | `127.0.0.1` | Listen address; use `0.0.0.0` when containerizing |
 | `PORT` | `3001` | Integer from 1 to 65535 |
 | `DARAJA_MODE` | `fake` | Only supported adapter mode in this scaffold |
+| `PAYMENT_STORE` | `memory` | `memory` for local use; `postgres` when RDS is available |
+| `DATABASE_URL` | — | Required when `PAYMENT_STORE=postgres`; obtain at runtime from Secrets Manager |
 
 For example: `PORT=3100 npm start`. Configuration comes from the process
 environment; `.env` files are not loaded automatically. Invalid configuration
 exits with a nonzero status. SIGINT/SIGTERM stop the server, allowing up to ten
 seconds for existing connections to close.
+
+## PostgreSQL store
+
+`migrations/001_create_payment_attempts.sql` creates the service-owned
+`payments` schema and payment-attempt table. It enforces unique
+`(tenant_id, idempotency_key)` values and one `pending` or `succeeded` attempt
+per tenant sale. Apply it using the team-agreed migration runner and the
+least-privilege Payments database role; do not apply it manually in production.
+
+Set `PAYMENT_STORE=postgres` and provide `DATABASE_URL` at runtime only after
+Platform provisions RDS and Secrets Manager. The ECS task definition currently
+uses the safe local default, `PAYMENT_STORE=memory`, until that work is ready.
+Do not commit database credentials or connection strings.
 
 ## Scope and extension points
 
@@ -64,12 +79,13 @@ The fake Daraja client intentionally does not provide durable idempotency. It
 is an in-memory local test double, so its state is lost whenever the service
 restarts.
 
-The API now enforces these rules through an in-memory store: an identical retry
-returns the same payment attempt, a reused key with changed input returns
-`409`, and a second pending or successful payment for one tenant sale returns
-`409`. The store is erased on restart; a PostgreSQL repository must enforce the
-same constraints durably.
+The API enforces these rules through the local in-memory store and the
+PostgreSQL repository: an identical retry returns the same payment attempt, a
+reused key with changed input returns `409`, and a second pending or successful
+payment for one tenant sale returns `409`. Memory mode is erased on restart;
+PostgreSQL mode persists the same rules through database constraints.
 
-Next work: service authentication and tenant authorization, PostgreSQL
-migrations, Daraja **sandbox** integration, callbacks, reconciliation, B2C,
-telemetry, and container packaging. No real-money mode is included.
+Next work: provision RDS and the least-privilege Payments role, wire its secret
+into ECS, then add service authentication and tenant authorization, Daraja
+**sandbox** integration, callbacks, reconciliation, B2C, and telemetry. No
+real-money mode is included.
