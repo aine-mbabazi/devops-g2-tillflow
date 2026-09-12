@@ -6,12 +6,16 @@ import { loadConfig } from '../src/config.js';
 import { FakeDarajaClient } from '../src/daraja/fake-client.js';
 
 test('configuration defaults to local fake mode and rejects invalid settings', () => {
-  assert.deepEqual(loadConfig({}), { host: '127.0.0.1', port: 3001, darajaMode: 'fake' });
+  assert.deepEqual(loadConfig({}), {
+    host: '127.0.0.1', port: 3001, darajaMode: 'fake', paymentStore: 'memory', databaseUrl: undefined,
+  });
   for (const port of ['0', '-1', '65536', '3001x', '1.5', '']) {
     assert.throws(() => loadConfig({ PORT: port }), /PORT/);
   }
   assert.throws(() => loadConfig({ DARAJA_MODE: 'production' }), /Only DARAJA_MODE=fake/);
   assert.throws(() => loadConfig({ HOST: '' }), /HOST/);
+  assert.throws(() => loadConfig({ PAYMENT_STORE: 'postgres' }), /DATABASE_URL/);
+  assert.throws(() => loadConfig({ PAYMENT_STORE: 'unknown' }), /PAYMENT_STORE/);
 });
 
 test('HTTP health works; payment routes are not exposed and logs omit query data', async (t) => {

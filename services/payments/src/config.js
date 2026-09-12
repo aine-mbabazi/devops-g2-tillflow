@@ -9,5 +9,13 @@ export function loadConfig(env = process.env) {
   if (darajaMode !== 'fake') {
     throw new Error('Only DARAJA_MODE=fake is implemented; sandbox integration comes later');
   }
-  return Object.freeze({ host, port: Number(rawPort), darajaMode });
+  const paymentStore = env.PAYMENT_STORE ?? 'memory';
+  if (!['memory', 'postgres'].includes(paymentStore)) {
+    throw new Error('PAYMENT_STORE must be memory or postgres');
+  }
+  const databaseUrl = env.DATABASE_URL;
+  if (paymentStore === 'postgres' && !databaseUrl) {
+    throw new Error('DATABASE_URL is required when PAYMENT_STORE=postgres');
+  }
+  return Object.freeze({ host, port: Number(rawPort), darajaMode, paymentStore, databaseUrl });
 }

@@ -64,13 +64,13 @@ export function createApp({ darajaClient, paymentStore = new InMemoryPaymentStor
       let input;
       try { input = validatePayment(await readJsonBody(req), req.headers['idempotency-key']); } catch { input = null; }
       if (!input) { statusCode = 400; sendJson(res, statusCode, { error: 'invalid_request' }); return; }
-      const result = paymentStore.createOrGet(input);
+      const result = await paymentStore.createOrGet(input);
       if (result.kind === 'idempotency_conflict') { statusCode = 409; sendJson(res, statusCode, { error: 'idempotency_key_reused' }); return; }
       if (result.kind === 'sale_conflict') { statusCode = 409; sendJson(res, statusCode, { error: 'sale_payment_exists' }); return; }
       if (result.kind === 'created') {
         try {
           const provider = await darajaClient.initiateStkPush({ amountMinor: input.amountMinor, currency: input.currency, phone: input.customerPhone });
-          paymentStore.attachProviderRequest(result.payment.id, provider.providerRequestId);
+          await paymentStore.attachProviderRequest(result.payment.id, provider.providerRequestId);
         } catch (error) {
           // It is already recorded: reconciliation, never another create, resolves this later.
           log({ event: 'provider_dispatch_unconfirmed', paymentId: result.payment.id, code: error.code ?? 'UNKNOWN' });
@@ -82,7 +82,7 @@ export function createApp({ darajaClient, paymentStore = new InMemoryPaymentStor
     }
     const match = /^\/payments\/([^/]+)$/.exec(path);
     if (match && req.method === 'GET') {
-      const payment = paymentStore.findById(decodeURIComponent(match[1]));
+      const payment = await paymentStore.findById(decodeURIComponent(match[1]));
       if (!payment) { statusCode = 404; sendJson(res, statusCode, { error: 'not_found' }); return; }
       statusCode = 200; sendJson(res, statusCode, toPaymentResponse(payment)); return;
     }
