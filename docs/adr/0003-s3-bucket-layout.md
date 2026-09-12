@@ -19,7 +19,7 @@ account-ID suffix for global uniqueness:
 
 | Bucket | Purpose | Versioning | Encryption | Lifecycle |
 |--------|---------|------------|------------|-----------|
-| `devops-g2-tfstate-<account-id>` | Terraform remote state | Enabled | SSE-KMS | Keep all versions (state history is small; never expire) |
+| `devops-g2-tillflow-tfstate-<account-id>` | Terraform remote state | Enabled | SSE-KMS | Keep all versions (state history is small; never expire) |
 | `devops-g2-artifacts-<account-id>` | Pipeline/build artifacts | Enabled | SSE-KMS | Expire noncurrent versions after 14 days; move current to Infrequent Access after 30 days |
 | `devops-g2-logs-<account-id>` | ALB access logs | Enabled | SSE-KMS | Move to Infrequent Access after 30 days; expire after 90 days |
 | `devops-g2-backups-<account-id>` | DB/export backups | Enabled | SSE-KMS | Move to Infrequent Access after 7 days; expire after 30 days (matches the 7-day RDS snapshot retention in ADR 0002, plus buffer) |

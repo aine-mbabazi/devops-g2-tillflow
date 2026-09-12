@@ -10,7 +10,6 @@ terraform {
 
 provider "aws" {
   region  = "us-east-2"
-  profile = "assignment3"
 }
 
 data "aws_caller_identity" "current" {}
