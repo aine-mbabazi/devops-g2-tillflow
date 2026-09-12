@@ -75,6 +75,10 @@ resource "aws_ecs_service" "payments" {
     container_name   = "payments"
     container_port   = 3001
   }
+  lifecycle {
+    ignore_changes = [task_definition]
+  }
+
 
   depends_on = [aws_lb_listener_rule.payments]
 
