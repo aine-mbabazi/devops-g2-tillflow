@@ -4,18 +4,70 @@ import test from 'node:test';
 import { createApp } from '../src/app.js';
 import { loadConfig } from '../src/config.js';
 import { FakeDarajaClient } from '../src/daraja/fake-client.js';
+import { DarajaSandboxClient } from '../src/daraja/sandbox-client.js';
 
 test('configuration defaults to local fake mode and rejects invalid settings', () => {
   assert.deepEqual(loadConfig({}), {
     host: '127.0.0.1', port: 3001, darajaMode: 'fake', paymentStore: 'memory', databaseUrl: undefined,
+    sandbox: { consumerKey: undefined, consumerSecret: undefined, shortcode: undefined, passkey: undefined, callbackUrl: undefined, timeoutMs: 10000 },
   });
   for (const port of ['0', '-1', '65536', '3001x', '1.5', '']) {
     assert.throws(() => loadConfig({ PORT: port }), /PORT/);
   }
-  assert.throws(() => loadConfig({ DARAJA_MODE: 'production' }), /Only DARAJA_MODE=fake/);
+  assert.throws(() => loadConfig({ DARAJA_MODE: 'production' }), /DARAJA_MODE/);
   assert.throws(() => loadConfig({ HOST: '' }), /HOST/);
   assert.throws(() => loadConfig({ PAYMENT_STORE: 'postgres' }), /DATABASE_URL/);
   assert.throws(() => loadConfig({ PAYMENT_STORE: 'unknown' }), /PAYMENT_STORE/);
+  assert.throws(() => loadConfig({ DARAJA_MODE: 'sandbox' }), /credentials/);
+  const sandboxEnv = { DARAJA_MODE: 'sandbox', DARAJA_CONSUMER_KEY: 'key', DARAJA_CONSUMER_SECRET: 'secret', DARAJA_STK_SHORTCODE: '174379', DARAJA_STK_PASSKEY: 'passkey', DARAJA_STK_CALLBACK_URL: 'https://example.test/callback' };
+  assert.throws(() => loadConfig({ ...sandboxEnv, DARAJA_STK_CALLBACK_URL: 'http://example.test/callback' }), /HTTPS/);
+  assert.throws(() => loadConfig({ ...sandboxEnv, DARAJA_STK_SHORTCODE: 'x' }), /numeric/);
+  assert.throws(() => loadConfig({ ...sandboxEnv, DARAJA_TIMEOUT_MS: '1' }), /TIMEOUT/);
+});
+
+test('Daraja sandbox client requests OAuth then sends one STK Push with a provider ID', async () => {
+  const calls = [];
+  const fetchImpl = async (url, options = {}) => {
+    calls.push({ url, options });
+    if (url.includes('/oauth/')) return new Response(JSON.stringify({ access_token: 'sandbox-token' }), { status: 200 });
+    return new Response(JSON.stringify({ CheckoutRequestID: 'ws_CO_123' }), { status: 200 });
+  };
+  const client = new DarajaSandboxClient({
+    consumerKey: 'key', consumerSecret: 'secret', shortcode: '174379', passkey: 'passkey',
+    callbackUrl: 'https://example.test/callback', fetchImpl, now: () => new Date('2026-01-02T00:04:05Z'),
+  });
+  const result = await client.initiateStkPush({ amountMinor: 10000, currency: 'KES', phone: '+254700000001', reference: 'payment_demo_001' });
+  assert.deepEqual(result, { providerRequestId: 'ws_CO_123', status: 'pending' });
+  assert.equal(calls.length, 2);
+  assert.match(calls[0].options.headers.Authorization, /^Basic /);
+  const body = JSON.parse(calls[1].options.body);
+  assert.equal(body.Amount, 100);
+  assert.equal(body.PhoneNumber, '254700000001');
+  assert.equal(body.AccountReference, 'payment_demo_001');
+  assert.equal(body.Timestamp, '20260102030405');
+  await assert.rejects(client.initiateStkPush({ amountMinor: 101, currency: 'KES', phone: '+254700000001', reference: 'x' }), /whole KES/);
+});
+
+test('Daraja client reuses an unexpired OAuth token and classifies timeout uncertainty', async () => {
+  let now = new Date('2026-01-02T00:00:00Z');
+  let oauthCalls = 0;
+  const client = new DarajaSandboxClient({
+    consumerKey: 'key', consumerSecret: 'secret', shortcode: '174379', passkey: 'passkey', callbackUrl: 'https://example.test/callback',
+    now: () => now,
+    fetchImpl: async (url) => {
+      if (url.includes('/oauth/')) { oauthCalls += 1; return new Response(JSON.stringify({ access_token: 'token', expires_in: 3600 })); }
+      return new Response(JSON.stringify({ CheckoutRequestID: `ws_${oauthCalls}` }));
+    },
+  });
+  await client.initiateStkPush({ amountMinor: 100, currency: 'KES', phone: '+254700000001', reference: 'one' });
+  now = new Date('2026-01-02T00:10:00Z');
+  await client.initiateStkPush({ amountMinor: 100, currency: 'KES', phone: '+254700000001', reference: 'two' });
+  assert.equal(oauthCalls, 1);
+  const timeoutClient = new DarajaSandboxClient({
+    consumerKey: 'key', consumerSecret: 'secret', shortcode: '174379', passkey: 'passkey', callbackUrl: 'https://example.test/callback',
+    fetchImpl: async (_url, { signal }) => await new Promise((_, reject) => signal.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')))), timeoutMs: 1,
+  });
+  await assert.rejects(timeoutClient.initiateStkPush({ amountMinor: 100, currency: 'KES', phone: '+254700000001', reference: 'three' }), (error) => error.code === 'DARAJA_TIMEOUT');
 });
 
 test('HTTP health works; payment routes are not exposed and logs omit query data', async (t) => {
