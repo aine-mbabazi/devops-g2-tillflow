@@ -42,9 +42,7 @@ RDS | Redis | S3 | SQS | Daraja
 
 ## Diagram
 
-(Add a rendered diagram here — draw.io, Excalidraw, or similar export — showing
-the request flow: Web -> API Gateway -> ALB -> ECS services -> RDS/Redis/SQS/Daraja,
-plus the ADOT sidecar -> CloudWatch/X-Ray/Grafana path.)
+![TillFlow architecture](architecture-diagram.svg)
 
 ## Region
 
