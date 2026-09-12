@@ -9,7 +9,13 @@ AWS ECS Fargate. DevOps Mentorship 2026 final capstone.
 - Terraform >= 1.5
 - Docker
 - AWS CLI configured with appropriate credentials
-- Node.js / Python (per-service runtime — update once services are scaffolded)
+- Node.js 20+ and npm for the Payments scaffold (other service runtimes TBD)
+
+## Local development
+
+The [Payments service](services/payments/README.md) has a local scaffold with a
+health endpoint and a fake Daraja client. From `services/payments`, run
+`npm start` or `npm test`. See its README for configuration and current scope.
 
 ## Ownership
 
