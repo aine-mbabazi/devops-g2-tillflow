@@ -32,6 +32,12 @@ No dependency installation, AWS resources, database, or credentials are needed.
 | `DARAJA_MODE` | `fake` | Only supported adapter mode in this scaffold |
 | `PAYMENT_STORE` | `memory` | `memory` for local use; `postgres` when RDS is available |
 | `DATABASE_URL` | — | Required when `PAYMENT_STORE=postgres`; obtain at runtime from Secrets Manager |
+| `DARAJA_CONSUMER_KEY` | — | Required in sandbox mode; obtain from Secrets Manager |
+| `DARAJA_CONSUMER_SECRET` | — | Required in sandbox mode; obtain from Secrets Manager |
+| `DARAJA_STK_SHORTCODE` | — | Required in sandbox mode |
+| `DARAJA_STK_PASSKEY` | — | Required in sandbox mode; obtain from Secrets Manager |
+| `DARAJA_STK_CALLBACK_URL` | — | Required public HTTPS callback URL in sandbox mode |
+| `DARAJA_TIMEOUT_MS` | `10000` | Sandbox request timeout, from 1000 to 30000 milliseconds |
 
 For example: `PORT=3100 npm start`. Configuration comes from the process
 environment; `.env` files are not loaded automatically. Invalid configuration
@@ -50,6 +56,17 @@ Set `PAYMENT_STORE=postgres` and provide `DATABASE_URL` at runtime only after
 Platform provisions RDS and Secrets Manager. The ECS task definition currently
 uses the safe local default, `PAYMENT_STORE=memory`, until that work is ready.
 Do not commit database credentials or connection strings.
+
+## Daraja sandbox STK Push
+
+Set `DARAJA_MODE=sandbox` only after Platform supplies the five Daraja values
+above through Secrets Manager. The client obtains an OAuth token and submits an
+STK Push request, persisting Daraja's `CheckoutRequestID` on the payment
+attempt. Amounts are accepted by TillFlow in minor units and must represent a
+whole KES amount for Daraja; the client refuses to round. A dispatch timeout or
+provider error leaves the already-recorded payment `pending` for reconciliation.
+OAuth tokens are cached until one minute before their provider expiry. Callbacks
+and transaction-query reconciliation are not implemented yet.
 
 ## Scope and extension points
 

@@ -69,7 +69,7 @@ export function createApp({ darajaClient, paymentStore = new InMemoryPaymentStor
       if (result.kind === 'sale_conflict') { statusCode = 409; sendJson(res, statusCode, { error: 'sale_payment_exists' }); return; }
       if (result.kind === 'created') {
         try {
-          const provider = await darajaClient.initiateStkPush({ amountMinor: input.amountMinor, currency: input.currency, phone: input.customerPhone });
+          const provider = await darajaClient.initiateStkPush({ amountMinor: input.amountMinor, currency: input.currency, phone: input.customerPhone, reference: result.payment.id });
           await paymentStore.attachProviderRequest(result.payment.id, provider.providerRequestId);
         } catch (error) {
           // It is already recorded: reconciliation, never another create, resolves this later.
