@@ -67,7 +67,7 @@ jobs:
       # --ignore-unfixed: a finding with no available fix is not something this
       # PR can act on. The brief's gate is fixable HIGH/CRITICAL.
       - name: Scan service dependencies
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.33.1
         with:
           scan-type: fs
           scan-ref: services
@@ -83,7 +83,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Scan Terraform
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.33.1
         with:
           scan-type: config
           scan-ref: infra
