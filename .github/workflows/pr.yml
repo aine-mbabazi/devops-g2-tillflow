@@ -108,7 +108,6 @@ jobs:
             config \
               --severity HIGH,CRITICAL \
               --exit-code 1 \
-              --no-progress \
               /workspace/infra
 
   terraform-plan:
