@@ -7,6 +7,12 @@ on:
 permissions:
   contents: read
 
+# Superseded pushes to the same PR are worth cancelling; their plans would
+# contend on the Terraform state lock for a result nobody will read.
+concurrency:
+  group: pr-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   payments-tests:
     name: Payments — lint & test
@@ -20,6 +26,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: npm
+          cache-dependency-path: services/payments/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
 
       - name: Run tests
         run: npm test
@@ -46,6 +57,39 @@ jobs:
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  dependency-scan:
+    name: Dependency scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # --ignore-unfixed: a finding with no available fix is not something this
+      # PR can act on. The brief's gate is fixable HIGH/CRITICAL.
+      - name: Scan service dependencies
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: fs
+          scan-ref: services
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+          format: table
+
+  iac-scan:
+    name: IaC scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Scan Terraform
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: config
+          scan-ref: infra
+          severity: HIGH,CRITICAL
+          exit-code: '1'
+          format: table
 
   terraform-plan:
     name: Terraform plan (infra/main)
