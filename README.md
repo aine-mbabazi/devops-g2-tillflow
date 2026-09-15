@@ -51,12 +51,27 @@ terraform apply
 ```
 
 ### Deploy infrastructure changes
+
+Infrastructure is applied by CI, not from a laptop. Opening a PR that touches
+`infra/main/` runs `terraform plan`; merging to `main` runs the **Infra Apply**
+workflow, which plans, uploads the plan as an artifact, then waits for approval
+on the protected `production` environment before applying that exact plan file.
+
+To inspect a plan locally without applying:
 ```bash
 cd infra/main
 terraform init
 terraform plan
-terraform apply
 ```
+
+#### One-time repository setup for the apply gate
+1. Create a `production` environment (Settings → Environments) with at least one
+   required reviewer.
+2. Set the repository variable `AWS_CI_APPLY_ROLE_ARN` to the
+   `devops-g2-ci-apply` role ARN (the `github_actions_apply_role_arn` output).
+3. The apply role itself is created by Terraform, so the very first
+   `terraform apply` that introduces it must run locally with admin
+   credentials. Every apply after that goes through CI.
 
 ### Deploy application changes (Payments)
 Automated via GitHub Actions on every merge to `main` that touches
