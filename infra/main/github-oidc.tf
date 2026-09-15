@@ -2,6 +2,10 @@ data "aws_iam_openid_connect_provider" "github" {
   url = "https://token.actions.githubusercontent.com"
 }
 
+data "aws_kms_key" "s3" {
+  key_id = "alias/${local.name_prefix}-s3-key"
+}
+
 data "aws_iam_policy_document" "github_actions_assume" {
   statement {
     actions = ["sts:AssumeRoleWithWebIdentity"]
@@ -79,8 +83,8 @@ data "aws_iam_policy_document" "github_actions_permissions" {
       "s3:ListBucket",
     ]
     resources = [
-      "arn:aws:s3:::devops-g2-tillflow-tfstate-240462142849",
-      "arn:aws:s3:::devops-g2-tillflow-tfstate-240462142849/*",
+      "arn:aws:s3:::${local.name_prefix}-tillflow-tfstate-${local.account_id}",
+      "arn:aws:s3:::${local.name_prefix}-tillflow-tfstate-${local.account_id}/*",
     ]
   }
 
@@ -88,7 +92,7 @@ data "aws_iam_policy_document" "github_actions_permissions" {
     sid       = "TerraformLock"
     effect    = "Allow"
     actions   = ["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:DeleteItem"]
-    resources = ["arn:aws:dynamodb:us-east-2:240462142849:table/devops-g2-tflock"]
+    resources = ["arn:aws:dynamodb:us-east-2:${local.account_id}:table/${local.name_prefix}-tflock"]
   }
   statement {
     sid    = "KMSDecryptState"
@@ -97,8 +101,7 @@ data "aws_iam_policy_document" "github_actions_permissions" {
       "kms:Decrypt",
       "kms:GenerateDataKey",
     ]
-    resources = ["arn:aws:kms:us-east-2:240462142849:key/8c6ce9d0-c78d-4158-a895-7e14d0fb8942"]
-
+    resources = [data.aws_kms_key.s3.arn]
   }
   statement {
     sid    = "TerraformReadForPlan"
