@@ -24,6 +24,9 @@ data "aws_iam_policy_document" "github_actions_assume" {
       values = [
         "aine-mbabazi/devops-g2-tillflow/.github/workflows/pr.yml@*",
         "aine-mbabazi/devops-g2-tillflow/.github/workflows/release.yml@*",
+        # Infra Apply's plan job. Its apply job assumes devops-g2-ci-apply
+        # instead; planning stays on this read-only role.
+        "aine-mbabazi/devops-g2-tillflow/.github/workflows/infra-apply.yml@*",
       ]
     }
   }
