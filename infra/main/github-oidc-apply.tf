@@ -69,6 +69,7 @@ data "aws_iam_policy_document" "github_apply_permissions" {
     sid    = "NetworkAndLoadBalancing"
     effect = "Allow"
     actions = [
+      "apigateway:*",
       "ec2:*",
       "elasticloadbalancing:*",
     ]
