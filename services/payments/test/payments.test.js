@@ -5,6 +5,7 @@ import { createApp } from '../src/app.js';
 import { loadConfig } from '../src/config.js';
 import { FakeDarajaClient } from '../src/daraja/fake-client.js';
 import { DarajaSandboxClient } from '../src/daraja/sandbox-client.js';
+import { InMemoryPaymentStore } from '../src/payment-store.js';
 
 test('configuration defaults to local fake mode and rejects invalid settings', () => {
   assert.deepEqual(loadConfig({}), {
@@ -93,6 +94,41 @@ test('HTTP health works; payment routes are not exposed and logs omit query data
   assert.equal(missing.status, 404);
   assert.ok(entries.length >= 4);
   assert.ok(!JSON.stringify(entries).includes('synthetic-private-value'));
+});
+
+test('readiness reports the dependency, health does not', async (t) => {
+  let storeReachable = true;
+  const store = new InMemoryPaymentStore();
+  store.ping = () => { if (!storeReachable) throw Object.assign(new Error('down'), { code: 'ECONNREFUSED' }); };
+  const entries = [];
+  const server = createApp({ darajaClient: new FakeDarajaClient(), paymentStore: store, log: (entry) => entries.push(entry) });
+  t.after(() => new Promise((resolve) => { server.close(resolve); server.closeAllConnections(); }));
+  server.listen(0, '127.0.0.1');
+  await once(server, 'listening');
+  const base = `http://127.0.0.1:${server.address().port}`;
+
+  const ready = await fetch(`${base}/ready`);
+  assert.equal(ready.status, 200);
+  assert.deepEqual(await ready.json(), { service: 'payments', status: 'ready' });
+
+  storeReachable = false;
+  const notReady = await fetch(`${base}/ready`);
+  assert.equal(notReady.status, 503);
+  assert.deepEqual(await notReady.json(), { service: 'payments', status: 'not_ready' });
+
+  // Liveness must stay green while readiness is red, otherwise a database blip
+  // restarts every task instead of draining traffic.
+  assert.equal((await fetch(`${base}/health`)).status, 200);
+
+  const head = await fetch(`${base}/ready`, { method: 'HEAD' });
+  assert.equal(head.status, 503);
+  assert.equal(await head.text(), '');
+
+  const post = await fetch(`${base}/ready`, { method: 'POST' });
+  assert.equal(post.status, 405);
+  assert.equal(post.headers.get('allow'), 'GET, HEAD');
+
+  assert.ok(entries.some((entry) => entry.event === 'readiness_check_failed' && entry.code === 'ECONNREFUSED'));
 });
 
 test('fake payment stays pending until explicitly resolved; replay preserves outcome', async () => {

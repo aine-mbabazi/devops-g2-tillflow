@@ -45,18 +45,38 @@ export function createApp({ darajaClient, paymentStore = new InMemoryPaymentStor
   return createServer(async (req, res) => {
     const path = req.url?.split('?')[0] ?? '';
     const isHealth = path === '/health';
+    const isReady = path === '/ready';
     let statusCode = 500;
 
     res.on('finish', () => log({
       event: 'http_request',
-      route: isHealth ? '/health' : path === '/payments' ? 'POST /payments' : /^\/payments\/[^/]+$/.test(path) ? 'GET /payments/:id' : 'unmatched',
+      route: isHealth ? '/health' : isReady ? '/ready' : path === '/payments' ? 'POST /payments' : /^\/payments\/[^/]+$/.test(path) ? 'GET /payments/:id' : 'unmatched',
       statusCode,
     }));
+    // Liveness: the process is up. Deliberately dependency-free, so a database
+    // blip restarts nothing — it only drains traffic via /ready below.
     if (isHealth) {
       if (req.method === 'GET' || req.method === 'HEAD') {
         statusCode = 200;
         res.writeHead(statusCode, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
         res.end(req.method === 'HEAD' ? undefined : JSON.stringify({ service: 'payments', status: 'ok' }));
+      } else { statusCode = 405; sendJson(res, statusCode, { error: 'method_not_allowed' }, { Allow: 'GET, HEAD' }); }
+      return;
+    }
+    // Readiness: dependencies are reachable, so the load balancer may send
+    // traffic. This is what the ALB target group polls.
+    if (isReady) {
+      if (req.method === 'GET' || req.method === 'HEAD') {
+        try {
+          await paymentStore.ping();
+          statusCode = 200;
+        } catch (error) {
+          log({ event: 'readiness_check_failed', code: error.code ?? 'UNKNOWN' });
+          statusCode = 503;
+        }
+        const body = { service: 'payments', status: statusCode === 200 ? 'ready' : 'not_ready' };
+        res.writeHead(statusCode, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+        res.end(req.method === 'HEAD' ? undefined : JSON.stringify(body));
       } else { statusCode = 405; sendJson(res, statusCode, { error: 'method_not_allowed' }, { Allow: 'GET, HEAD' }); }
       return;
     }

@@ -22,6 +22,9 @@ export class InMemoryPaymentStore {
     return { kind: 'created', payment };
   }
 
+  // In-memory state has no dependency to reach, so readiness is process liveness.
+  ping() {}
+
   findById(id) { return this.#byId.get(id) ?? null; }
 
   attachProviderRequest(id, providerRequestId) {

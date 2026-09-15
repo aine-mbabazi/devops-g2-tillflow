@@ -5,8 +5,10 @@ resource "aws_lb_target_group" "payments" {
   vpc_id      = aws_vpc.main.id
   target_type = "ip" # required for Fargate
 
+  # Readiness, not liveness: a task with an unreachable database must stop
+  # receiving traffic without being restarted.
   health_check {
-    path                = "/health"
+    path                = "/ready"
     protocol            = "HTTP"
     matcher             = "200"
     interval            = 30
@@ -29,7 +31,7 @@ resource "aws_lb_listener_rule" "payments" {
 
   condition {
     path_pattern {
-      values = ["/payments*", "/health"]
+      values = ["/payments*", "/health", "/ready"]
     }
   }
 }
