@@ -4,6 +4,8 @@ import { FakeDarajaClient } from './daraja/fake-client.js';
 import { DarajaSandboxClient } from './daraja/sandbox-client.js';
 import { InMemoryPaymentStore } from './payment-store.js';
 import { PostgresPaymentStore } from './postgres-payment-store.js';
+import { InMemoryPayoutStore } from './payout-store.js';
+import { PostgresPayoutStore } from './postgres-payout-store.js';
 
 const log = (entry) => console.log(JSON.stringify({
   timestamp: new Date().toISOString(), service: 'payments', ...entry,
@@ -13,16 +15,18 @@ async function start() {
   try {
   const config = loadConfig();
   let paymentStore = new InMemoryPaymentStore();
+  let payoutStore = new InMemoryPayoutStore();
   let pool;
   if (config.paymentStore === 'postgres') {
     const { Pool } = await import('pg');
     pool = new Pool({ connectionString: config.databaseUrl });
     paymentStore = new PostgresPaymentStore(pool);
+    payoutStore = new PostgresPayoutStore(pool);
   }
   const darajaClient = config.darajaMode === 'sandbox'
     ? new DarajaSandboxClient(config.sandbox)
     : new FakeDarajaClient();
-  const server = createApp({ darajaClient, paymentStore, log });
+  const server = createApp({ darajaClient, paymentStore, payoutStore, log });
   server.on('error', (error) => {
     log({ event: 'server_error', code: error.code ?? 'UNKNOWN' });
     process.exitCode = 1;
