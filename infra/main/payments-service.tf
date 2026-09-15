@@ -32,4 +32,6 @@ resource "aws_lb_listener_rule" "payments" {
       values = ["/payments*", "/health"]
     }
   }
+
+  tags = merge(local.common_tags, { service = "payments" })
 }
