@@ -23,10 +23,13 @@ resource "aws_ecs_task_definition" "payments" {
         { name = "OTEL_EXPORTER_OTLP_ENDPOINT", value = "http://localhost:4318" },
         { name = "OTEL_EXPORTER_OTLP_PROTOCOL", value = "http/protobuf" }
       ]
-      # The collector must be accepting OTLP before the app starts exporting,
-      # otherwise the first spans of every deploy are dropped.
+      # START, not HEALTHY: gating on the collector's health check would mean a
+      # collector that never goes healthy — bad IAM, slow image pull, config
+      # typo — stops payments starting at all. Ordering is all that is needed,
+      # because the SDK's batch processor queues spans until the collector
+      # answers.
       dependsOn = [
-        { containerName = "adot-collector", condition = "HEALTHY" }
+        { containerName = "adot-collector", condition = "START" }
       ]
       logConfiguration = {
         logDriver = "awslogs"
@@ -47,8 +50,9 @@ resource "aws_ecs_task_definition" "payments" {
     {
       name  = "adot-collector"
       image = "public.ecr.aws/aws-observability/aws-otel-collector:v0.43.3"
-      # Non-essential on purpose: losing telemetry must not take payments down.
-      # The dependsOn above only couples them at startup.
+      # Non-essential so a collector crash does not kill the task. Paired with
+      # the START condition above, a broken collector costs telemetry and
+      # nothing else.
       essential = false
       portMappings = [
         { containerPort = 4317, protocol = "tcp" },
@@ -89,6 +93,11 @@ resource "aws_ecs_service" "payments" {
     subnets         = aws_subnet.private[*].id
     security_groups = [aws_security_group.ecs_tasks.id]
   }
+
+  # Without a grace period a deploy started while Postgres is down is killed by
+  # the load balancer before it can ever report ready, turning an outage into a
+  # crash loop.
+  health_check_grace_period_seconds = 120
 
   load_balancer {
     target_group_arn = aws_lb_target_group.payments.arn

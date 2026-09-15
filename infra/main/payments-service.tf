@@ -5,8 +5,11 @@ resource "aws_lb_target_group" "payments" {
   vpc_id      = aws_vpc.main.id
   target_type = "ip" # required for Fargate
 
-  # Readiness, not liveness: a task with an unreachable database must stop
-  # receiving traffic without being restarted.
+  # Probes /ready so a task that cannot reach Postgres stops taking traffic.
+  # ECS derives task health from target health, so a sustained database outage
+  # fails every task and cycles them rather than only draining them; the
+  # service sets a health check grace period to keep that from killing a deploy
+  # started mid-outage.
   health_check {
     path                = "/ready"
     protocol            = "HTTP"
