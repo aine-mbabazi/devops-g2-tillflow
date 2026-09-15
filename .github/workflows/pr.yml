@@ -58,6 +58,11 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  # Both scans run Trivy from its published image rather than via
+  # aquasecurity/trivy-action. The action installs the binary through a shell
+  # script fetched from the Trivy repo, and that install step failed outright
+  # here — the scan itself never ran. The image has no such step, and pins the
+  # scanner version the same way.
   dependency-scan:
     name: Dependency scan
     runs-on: ubuntu-latest
@@ -67,14 +72,15 @@ jobs:
       # --ignore-unfixed: a finding with no available fix is not something this
       # PR can act on. The brief's gate is fixable HIGH/CRITICAL.
       - name: Scan service dependencies
-        uses: aquasecurity/trivy-action@v0.33.1
-        with:
-          scan-type: fs
-          scan-ref: services
-          severity: HIGH,CRITICAL
-          ignore-unfixed: true
-          exit-code: '1'
-          format: table
+        run: |
+          docker run --rm -v "$PWD:/workspace" \
+            public.ecr.aws/aquasecurity/trivy:0.65.0 \
+            filesystem \
+              --severity HIGH,CRITICAL \
+              --ignore-unfixed \
+              --exit-code 1 \
+              --no-progress \
+              /workspace/services
 
   iac-scan:
     name: IaC scan
@@ -83,13 +89,14 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Scan Terraform
-        uses: aquasecurity/trivy-action@v0.33.1
-        with:
-          scan-type: config
-          scan-ref: infra
-          severity: HIGH,CRITICAL
-          exit-code: '1'
-          format: table
+        run: |
+          docker run --rm -v "$PWD:/workspace" \
+            public.ecr.aws/aquasecurity/trivy:0.65.0 \
+            config \
+              --severity HIGH,CRITICAL \
+              --exit-code 1 \
+              --no-progress \
+              /workspace/infra
 
   terraform-plan:
     name: Terraform plan (infra/main)
