@@ -20,8 +20,16 @@ async function responseJson(response, operation) {
 }
 
 export class DarajaSandboxClient {
-  constructor({ consumerKey, consumerSecret, shortcode, passkey, callbackUrl, baseUrl = SANDBOX_BASE_URL, fetchImpl = fetch, now = () => new Date(), timeoutMs = 10_000 }) {
-    Object.assign(this, { consumerKey, consumerSecret, shortcode, passkey, callbackUrl, baseUrl: baseUrl.replace(/\/$/, ''), fetchImpl, now, timeoutMs });
+  constructor({
+    consumerKey, consumerSecret, shortcode, passkey, callbackUrl,
+    b2cShortcode, b2cInitiatorName, b2cSecurityCredential, b2cResultUrl, b2cTimeoutUrl,
+    baseUrl = SANDBOX_BASE_URL, fetchImpl = fetch, now = () => new Date(), timeoutMs = 10_000,
+  }) {
+    Object.assign(this, {
+      consumerKey, consumerSecret, shortcode, passkey, callbackUrl,
+      b2cShortcode, b2cInitiatorName, b2cSecurityCredential, b2cResultUrl, b2cTimeoutUrl,
+      baseUrl: baseUrl.replace(/\/$/, ''), fetchImpl, now, timeoutMs,
+    });
     this.accessToken = null;
     this.accessTokenExpiresAt = 0;
   }
@@ -53,6 +61,53 @@ export class DarajaSandboxClient {
     return { providerRequestId: body.CheckoutRequestID, status: 'pending' };
   }
 
+  async initiateB2C({ amountMinor, currency, phone, reference }) {
+    if (currency !== 'KES' || !Number.isSafeInteger(amountMinor) || amountMinor <= 0 || amountMinor % 100 !== 0) {
+      throw new Error('Daraja B2C amount must be a positive whole KES amount');
+    }
+    const token = await this.#accessToken();
+    const msisdn = phone.replace(/^\+/, '');
+    const response = await this.#request(`${this.baseUrl}/mpesa/b2c/v1/paymentrequest`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        InitiatorName: this.b2cInitiatorName, SecurityCredential: this.b2cSecurityCredential,
+        CommandID: 'BusinessPayment', Amount: amountMinor / 100,
+        PartyA: this.b2cShortcode, PartyB: msisdn, Remarks: 'TillFlow commission payout',
+        QueueTimeOutURL: this.b2cTimeoutUrl, ResultURL: this.b2cResultUrl, Occasion: reference,
+      }),
+    });
+    const body = await responseJson(response, 'Daraja B2C payment request');
+    if (!body.ConversationID) {
+      const error = new Error('Daraja B2C response did not include ConversationID');
+      error.code = 'DARAJA_REQUEST_FAILED';
+      throw error;
+    }
+    return { providerRequestId: body.ConversationID, status: 'pending' };
+  }
+
+  // Sandbox transaction-status query, used for B2C reconciliation the same way
+  // queryPayment reconciles STK. The exact sandbox request/response shape is
+  // unverified against real Daraja until integration testing (see
+  // docs/commission-payout-contract.md); transport failures throw and leave
+  // the payout pending for a later reconciliation attempt rather than guessing.
+  async queryB2C(providerRequestId) {
+    const token = await this.#accessToken();
+    const response = await this.#request(`${this.baseUrl}/mpesa/transactionstatus/v1/query`, {
+      method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        Initiator: this.b2cInitiatorName, SecurityCredential: this.b2cSecurityCredential,
+        CommandID: 'TransactionStatusQuery', TransactionID: providerRequestId,
+        PartyA: this.b2cShortcode, IdentifierType: '4',
+        ResultURL: this.b2cResultUrl, QueueTimeOutURL: this.b2cTimeoutUrl,
+        Remarks: 'TillFlow payout reconciliation', Occasion: 'reconciliation',
+      }),
+    });
+    const body = await responseJson(response, 'Daraja B2C transaction status query');
+    if (body.ResultCode === '0' || body.ResultCode === 0) return { providerRequestId, status: 'succeeded' };
+    return { providerRequestId, status: 'failed' };
+  }
+
   async #accessToken() {
     if (this.accessToken && this.now().getTime() < this.accessTokenExpiresAt) return this.accessToken;
     const basic = Buffer.from(`${this.consumerKey}:${this.consumerSecret}`).toString('base64');
@@ -67,6 +122,21 @@ export class DarajaSandboxClient {
     // that is about to expire at the provider.
     this.accessTokenExpiresAt = this.now().getTime() + Math.max(0, lifetimeMs - 60_000);
     return this.accessToken;
+  }
+
+  async queryPayment(providerRequestId) {
+    const token = await this.#accessToken();
+    const timestamp = eatTimestamp(this.now());
+    const password = Buffer.from(`${this.shortcode}${this.passkey}${timestamp}`).toString('base64');
+    const response = await this.#request(`${this.baseUrl}/mpesa/stkpushquery/v1/query`, {
+      method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ BusinessShortCode: this.shortcode, Password: password, Timestamp: timestamp, CheckoutRequestID: providerRequestId }),
+    });
+    const body = await responseJson(response, 'Daraja STK query');
+    if (body.ResultCode === '0' || body.ResultCode === 0) return { providerRequestId, status: 'succeeded' };
+    // A nonzero provider result is definitive only when the provider returns it;
+    // transport failures are thrown and remain pending for later reconciliation.
+    return { providerRequestId, status: 'failed' };
   }
 
   async #request(url, options) {

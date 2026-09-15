@@ -6,6 +6,14 @@ export class FakeDarajaClient {
   #attempts = new Map();
 
   async initiateStkPush({ amountMinor, currency, phone }) {
+    return this.#initiate('fake', amountMinor, currency, phone);
+  }
+
+  async initiateB2C({ amountMinor, currency, phone }) {
+    return this.#initiate('fake-b2c', amountMinor, currency, phone);
+  }
+
+  #initiate(prefix, amountMinor, currency, phone) {
     if (!Number.isSafeInteger(amountMinor) || amountMinor <= 0) {
       throw new Error('amountMinor must be a positive safe integer');
     }
@@ -13,7 +21,7 @@ export class FakeDarajaClient {
     if (typeof phone !== 'string' || !phone.trim()) {
       throw new Error('A synthetic test phone is required');
     }
-    const providerRequestId = `fake-${randomUUID()}`;
+    const providerRequestId = `${prefix}-${randomUUID()}`;
     this.#attempts.set(providerRequestId, 'pending');
     return { providerRequestId, status: 'pending' };
   }
@@ -21,6 +29,12 @@ export class FakeDarajaClient {
   async queryPayment(providerRequestId) {
     if (!this.#attempts.has(providerRequestId)) throw new Error('Unknown fake payment');
     return { providerRequestId, status: this.#attempts.get(providerRequestId) };
+  }
+
+  // B2C reconciliation uses the same query semantics as STK reconciliation;
+  // both ultimately ask "what is the provider's definitive outcome for this ID?"
+  async queryB2C(providerRequestId) {
+    return this.queryPayment(providerRequestId);
   }
 
   // Test-only control: initiation alone never implies a successful payment.
