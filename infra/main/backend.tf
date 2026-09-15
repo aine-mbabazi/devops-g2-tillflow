@@ -6,6 +6,5 @@ terraform {
     dynamodb_table = "devops-g2-tflock"
     encrypt        = true
     kms_key_id     = "alias/devops-g2-s3-key"
-    profile        = "assignment3"
   }
 }
