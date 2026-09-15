@@ -4,9 +4,10 @@ import { FakeDarajaClient } from './daraja/fake-client.js';
 import { DarajaSandboxClient } from './daraja/sandbox-client.js';
 import { InMemoryPaymentStore } from './payment-store.js';
 import { PostgresPaymentStore } from './postgres-payment-store.js';
+import { traceContext } from './telemetry.js';
 
 const log = (entry) => console.log(JSON.stringify({
-  timestamp: new Date().toISOString(), service: 'payments', ...entry,
+  timestamp: new Date().toISOString(), service: 'payments', ...traceContext(), ...entry,
 }));
 
 async function start() {

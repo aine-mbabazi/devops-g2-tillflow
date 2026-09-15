@@ -2,10 +2,10 @@ resource "aws_ecs_task_definition" "payments" {
   family                   = "${local.name_prefix}-payments"
   requires_compatibilities = ["FARGATE"]
   network_mode             = "awsvpc"
-  cpu                       = "256"
-  memory                    = "512"
-  execution_role_arn        = aws_iam_role.payments_execution.arn
-  task_role_arn              = aws_iam_role.payments_task.arn
+  cpu                      = "256"
+  memory                   = "512"
+  execution_role_arn       = aws_iam_role.payments_execution.arn
+  task_role_arn            = aws_iam_role.payments_task.arn
 
   container_definitions = jsonencode([
     {
@@ -18,7 +18,15 @@ resource "aws_ecs_task_definition" "payments" {
       environment = [
         { name = "HOST", value = "0.0.0.0" },
         { name = "PORT", value = "3001" },
-        { name = "DARAJA_MODE", value = "fake" }
+        { name = "DARAJA_MODE", value = "fake" },
+        { name = "OTEL_SERVICE_NAME", value = "payments" },
+        { name = "OTEL_EXPORTER_OTLP_ENDPOINT", value = "http://localhost:4318" },
+        { name = "OTEL_EXPORTER_OTLP_PROTOCOL", value = "http/protobuf" }
+      ]
+      # The collector must be accepting OTLP before the app starts exporting,
+      # otherwise the first spans of every deploy are dropped.
+      dependsOn = [
+        { containerName = "adot-collector", condition = "HEALTHY" }
       ]
       logConfiguration = {
         logDriver = "awslogs"
@@ -37,12 +45,17 @@ resource "aws_ecs_task_definition" "payments" {
       }
     },
     {
-      name      = "adot-collector"
-      image     = "public.ecr.aws/aws-observability/aws-otel-collector:latest"
+      name  = "adot-collector"
+      image = "public.ecr.aws/aws-observability/aws-otel-collector:v0.43.3"
+      # Non-essential on purpose: losing telemetry must not take payments down.
+      # The dependsOn above only couples them at startup.
       essential = false
       portMappings = [
         { containerPort = 4317, protocol = "tcp" },
         { containerPort = 4318, protocol = "tcp" }
+      ]
+      environment = [
+        { name = "AOT_CONFIG_CONTENT", value = file("${path.module}/adot-config.yaml") }
       ]
       logConfiguration = {
         logDriver = "awslogs"
@@ -51,6 +64,13 @@ resource "aws_ecs_task_definition" "payments" {
           "awslogs-region"        = "us-east-2"
           "awslogs-stream-prefix" = "adot"
         }
+      }
+      healthCheck = {
+        command     = ["CMD", "/healthcheck"]
+        interval    = 10
+        timeout     = 5
+        retries     = 3
+        startPeriod = 10
       }
     }
   ])

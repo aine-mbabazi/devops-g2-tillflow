@@ -13,4 +13,4 @@ EXPOSE 3001
 
 USER node
 
-CMD ["node", "src/server.js"]
+CMD ["node", "--import", "./src/register.js", "--import", "./src/telemetry.js", "src/server.js"]
