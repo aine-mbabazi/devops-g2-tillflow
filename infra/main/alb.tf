@@ -11,11 +11,16 @@ resource "aws_security_group" "alb" {
     cidr_blocks = [aws_vpc.main.cidr_block]
   }
 
+  # The ALB only ever forwards to targets inside the VPC, so it has no reason
+  # to reach the internet. Scoped to the VPC CIDR rather than the ECS tasks
+  # security group, because that group already references this one and the
+  # pair would form a dependency cycle.
   egress {
+    description = "To targets within the VPC"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = [aws_vpc.main.cidr_block]
   }
 
   tags = merge(local.common_tags, { Name = "${local.name_prefix}-alb-sg", service = "networking" })
@@ -26,11 +31,12 @@ resource "aws_security_group" "alb" {
 }
 
 resource "aws_lb" "main" {
-  name               = "${local.name_prefix}-alb"
-  internal           = true
-  load_balancer_type = "application"
-  security_groups    = [aws_security_group.alb.id]
-  subnets            = aws_subnet.private[*].id
+  name                       = "${local.name_prefix}-alb"
+  internal                   = true
+  load_balancer_type         = "application"
+  security_groups            = [aws_security_group.alb.id]
+  subnets                    = aws_subnet.private[*].id
+  drop_invalid_header_fields = true
 
   tags = merge(local.common_tags, { Name = "${local.name_prefix}-alb", service = "networking" })
 }

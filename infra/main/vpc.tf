@@ -2,7 +2,7 @@ resource "aws_vpc" "main" {
   cidr_block           = "10.20.0.0/16"
   enable_dns_support   = true
   enable_dns_hostnames = true
-  tags = merge(local.common_tags, { Name = "${local.name_prefix}-vpc", service = "networking" })
+  tags                 = merge(local.common_tags, { Name = "${local.name_prefix}-vpc", service = "networking" })
 }
 
 resource "aws_internet_gateway" "main" {
@@ -11,12 +11,15 @@ resource "aws_internet_gateway" "main" {
 }
 
 resource "aws_subnet" "public" {
-  count                   = 2
-  vpc_id                  = aws_vpc.main.id
-  cidr_block              = cidrsubnet("10.20.0.0/16", 8, count.index)
-  availability_zone       = local.azs[count.index]
-  map_public_ip_on_launch = true
-  tags = merge(local.common_tags, { Name = "${local.name_prefix}-public-${count.index}", service = "networking" })
+  count             = 2
+  vpc_id            = aws_vpc.main.id
+  cidr_block        = cidrsubnet("10.20.0.0/16", 8, count.index)
+  availability_zone = local.azs[count.index]
+  # Nothing is launched into the public subnets except the NAT gateway, which
+  # carries its own Elastic IP. Auto-assigning public addresses would only
+  # expose anything added here later by mistake.
+  map_public_ip_on_launch = false
+  tags                    = merge(local.common_tags, { Name = "${local.name_prefix}-public-${count.index}", service = "networking" })
 }
 
 resource "aws_subnet" "private" {
@@ -24,7 +27,7 @@ resource "aws_subnet" "private" {
   vpc_id            = aws_vpc.main.id
   cidr_block        = cidrsubnet("10.20.0.0/16", 8, count.index + 10)
   availability_zone = local.azs[count.index]
-  tags = merge(local.common_tags, { Name = "${local.name_prefix}-private-${count.index}", service = "networking" })
+  tags              = merge(local.common_tags, { Name = "${local.name_prefix}-private-${count.index}", service = "networking" })
 }
 
 # Single NAT Gateway (not one per AZ) — cost trade-off consistent with the

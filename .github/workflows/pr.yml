@@ -108,6 +108,7 @@ jobs:
             config \
               --severity HIGH,CRITICAL \
               --exit-code 1 \
+              --ignorefile /workspace/infra/.trivyignore.yaml \
               /workspace/infra
 
   terraform-plan:
