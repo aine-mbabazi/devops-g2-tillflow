@@ -14,6 +14,11 @@ output "alb_dns_name" {
   value = aws_lb.main.dns_name
 }
 
+output "api_gateway_invoke_url" {
+  description = "Public entry point for the golden path"
+  value       = aws_apigatewayv2_stage.default.invoke_url
+}
+
 output "ecs_cluster_name" {
   value = aws_ecs_cluster.main.name
 }

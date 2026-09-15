@@ -65,9 +65,9 @@ data "aws_iam_policy_document" "github_actions_permissions" {
   }
 
   statement {
-    sid       = "PassRoleToECS"
-    effect    = "Allow"
-    actions   = ["iam:PassRole"]
+    sid     = "PassRoleToECS"
+    effect  = "Allow"
+    actions = ["iam:PassRole"]
     resources = [
       aws_iam_role.payments_execution.arn,
       aws_iam_role.payments_task.arn,
@@ -107,6 +107,7 @@ data "aws_iam_policy_document" "github_actions_permissions" {
     sid    = "TerraformReadForPlan"
     effect = "Allow"
     actions = [
+      "apigateway:GET",
       "ec2:Describe*",
       "ecs:Describe*",
       "ecs:List*",
