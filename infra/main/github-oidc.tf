@@ -2,8 +2,8 @@ data "aws_iam_openid_connect_provider" "github" {
   url = "https://token.actions.githubusercontent.com"
 }
 
-data "aws_kms_alias" "s3" {
-  name = "alias/${local.name_prefix}-s3-key"
+data "aws_kms_key" "s3" {
+  key_id = "alias/${local.name_prefix}-s3-key"
 }
 
 data "aws_iam_policy_document" "github_actions_assume" {
@@ -101,7 +101,7 @@ data "aws_iam_policy_document" "github_actions_permissions" {
       "kms:Decrypt",
       "kms:GenerateDataKey",
     ]
-    resources = [data.aws_kms_alias.s3.target_key_arn]
+    resources = [data.aws_kms_key.s3.arn]
   }
   statement {
     sid    = "TerraformReadForPlan"
