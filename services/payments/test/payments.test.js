@@ -5,25 +5,32 @@ import { createApp } from '../src/app.js';
 import { loadConfig } from '../src/config.js';
 import { FakeDarajaClient } from '../src/daraja/fake-client.js';
 import { DarajaSandboxClient } from '../src/daraja/sandbox-client.js';
+import { signServiceAuth } from '../../_shared/service-auth.js';
+
+const TEST_SECRET = 'test-service-auth-secret';
+function authHeader(tenantId) {
+  return { 'x-service-auth': signServiceAuth(tenantId, TEST_SECRET) };
+}
 
 test('configuration defaults to local fake mode and rejects invalid settings', () => {
-  assert.deepEqual(loadConfig({}), {
-    host: '127.0.0.1', port: 3001, darajaMode: 'fake', paymentStore: 'memory', databaseUrl: undefined,
+  assert.throws(() => loadConfig({}), /SERVICE_AUTH_SECRET/);
+  assert.deepEqual(loadConfig({ SERVICE_AUTH_SECRET: TEST_SECRET }), {
+    host: '127.0.0.1', port: 3001, darajaMode: 'fake', paymentStore: 'memory', databaseUrl: undefined, serviceAuthSecret: TEST_SECRET,
     sandbox: {
       consumerKey: undefined, consumerSecret: undefined, shortcode: undefined, passkey: undefined, callbackUrl: undefined, timeoutMs: 10000,
       b2cShortcode: undefined, b2cInitiatorName: undefined, b2cSecurityCredential: undefined, b2cResultUrl: undefined, b2cTimeoutUrl: undefined,
     },
   });
   for (const port of ['0', '-1', '65536', '3001x', '1.5', '']) {
-    assert.throws(() => loadConfig({ PORT: port }), /PORT/);
+    assert.throws(() => loadConfig({ PORT: port, SERVICE_AUTH_SECRET: TEST_SECRET }), /PORT/);
   }
-  assert.throws(() => loadConfig({ DARAJA_MODE: 'production' }), /DARAJA_MODE/);
-  assert.throws(() => loadConfig({ HOST: '' }), /HOST/);
-  assert.throws(() => loadConfig({ PAYMENT_STORE: 'postgres' }), /DATABASE_URL/);
-  assert.throws(() => loadConfig({ PAYMENT_STORE: 'unknown' }), /PAYMENT_STORE/);
-  assert.throws(() => loadConfig({ DARAJA_MODE: 'sandbox' }), /credentials/);
+  assert.throws(() => loadConfig({ DARAJA_MODE: 'production', SERVICE_AUTH_SECRET: TEST_SECRET }), /DARAJA_MODE/);
+  assert.throws(() => loadConfig({ HOST: '', SERVICE_AUTH_SECRET: TEST_SECRET }), /HOST/);
+  assert.throws(() => loadConfig({ PAYMENT_STORE: 'postgres', SERVICE_AUTH_SECRET: TEST_SECRET }), /DATABASE_URL/);
+  assert.throws(() => loadConfig({ PAYMENT_STORE: 'unknown', SERVICE_AUTH_SECRET: TEST_SECRET }), /PAYMENT_STORE/);
+  assert.throws(() => loadConfig({ DARAJA_MODE: 'sandbox', SERVICE_AUTH_SECRET: TEST_SECRET }), /credentials/);
   const sandboxEnv = {
-    DARAJA_MODE: 'sandbox', DARAJA_CONSUMER_KEY: 'key', DARAJA_CONSUMER_SECRET: 'secret',
+    DARAJA_MODE: 'sandbox', DARAJA_CONSUMER_KEY: 'key', DARAJA_CONSUMER_SECRET: 'secret', SERVICE_AUTH_SECRET: TEST_SECRET,
     DARAJA_STK_SHORTCODE: '174379', DARAJA_STK_PASSKEY: 'passkey', DARAJA_STK_CALLBACK_URL: 'https://example.test/callback',
     DARAJA_B2C_SHORTCODE: '600000', DARAJA_B2C_INITIATOR_NAME: 'testapi', DARAJA_B2C_SECURITY_CREDENTIAL: 'cred',
     DARAJA_B2C_RESULT_URL: 'https://example.test/b2c/result', DARAJA_B2C_TIMEOUT_URL: 'https://example.test/b2c/timeout',
@@ -107,9 +114,23 @@ test('Daraja client reuses an unexpired OAuth token and classifies timeout uncer
   await assert.rejects(timeoutClient.initiateStkPush({ amountMinor: 100, currency: 'KES', phone: '+254700000001', reference: 'three' }), (error) => error.code === 'DARAJA_TIMEOUT');
 });
 
+test('service-auth tokens verify only when correctly signed, fresh, and unmodified', async () => {
+  const { verifyServiceAuth } = await import('../../_shared/service-auth.js');
+  const token = signServiceAuth('tenant_demo_001', TEST_SECRET, () => 1_000_000);
+  assert.deepEqual(verifyServiceAuth(token, TEST_SECRET, () => 1_000_000), { tenantId: 'tenant_demo_001' });
+  assert.equal(verifyServiceAuth(token, 'wrong-secret', () => 1_000_000), null);
+  assert.equal(verifyServiceAuth('garbage', TEST_SECRET, () => 1_000_000), null);
+  assert.equal(verifyServiceAuth(undefined, TEST_SECRET, () => 1_000_000), null);
+  // A tampered tenant ID must not verify even though the rest of the token is untouched.
+  const [, timestamp, signature] = token.split('.');
+  assert.equal(verifyServiceAuth(`other_tenant.${timestamp}.${signature}`, TEST_SECRET, () => 1_000_000), null);
+  // Six minutes later is outside the 5-minute freshness window.
+  assert.equal(verifyServiceAuth(token, TEST_SECRET, () => 1_000_000 + 6 * 60 * 1000), null);
+});
+
 test('HTTP health works; payment routes are not exposed and logs omit query data', async (t) => {
   const entries = [];
-  const server = createApp({ darajaClient: new FakeDarajaClient(), log: (entry) => entries.push(entry) });
+  const server = createApp({ darajaClient: new FakeDarajaClient(), serviceAuthSecret: TEST_SECRET, log: (entry) => entries.push(entry) });
   t.after(() => new Promise((resolve) => {
     server.close(resolve);
     server.closeAllConnections();
@@ -185,7 +206,7 @@ async function startPayments(t) {
     return result;
   };
   const entries = [];
-  const server = createApp({ darajaClient: client, log: (entry) => entries.push(entry) });
+  const server = createApp({ darajaClient: client, serviceAuthSecret: TEST_SECRET, log: (entry) => entries.push(entry) });
   t.after(() => new Promise((resolve) => { server.close(resolve); server.closeAllConnections(); }));
   server.listen(0, '127.0.0.1');
   await once(server, 'listening');
@@ -200,12 +221,16 @@ async function startPayments(t) {
   };
 }
 
-function requestPayment(base, body, key = 'payment-request-001') {
+function requestPayment(base, body, key = 'payment-request-001', authTenantId = body.tenant_id) {
   return fetch(`${base}/payments`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json', 'idempotency-key': key },
+    headers: { 'content-type': 'application/json', 'idempotency-key': key, ...authHeader(authTenantId) },
     body: JSON.stringify(body),
   });
+}
+
+function getPayment(base, id, tenantId) {
+  return fetch(`${base}/payments/${id}`, { headers: { ...authHeader(tenantId) } });
 }
 
 function postCallback(base, checkoutRequestId) {
@@ -216,12 +241,16 @@ function postCallback(base, checkoutRequestId) {
   });
 }
 
-function requestPayout(base, body, key = 'payout-request-001') {
+function requestPayout(base, body, key = 'payout-request-001', authTenantId = body.tenant_id) {
   return fetch(`${base}/payouts`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json', 'idempotency-key': key },
+    headers: { 'content-type': 'application/json', 'idempotency-key': key, ...authHeader(authTenantId) },
     body: JSON.stringify(body),
   });
+}
+
+function getPayout(base, id, tenantId) {
+  return fetch(`${base}/payouts/${id}`, { headers: { ...authHeader(tenantId) } });
 }
 
 function postPayoutCallback(base, conversationId) {
@@ -253,7 +282,7 @@ test('creates and returns a pending payment attempt', async (t) => {
     amount_minor: 10000, currency: 'KES', status: 'pending',
   });
   assert.equal(getCalls(), 1);
-  const fetched = await fetch(`${base}/payments/${payment.payment_id}`);
+  const fetched = await getPayment(base, payment.payment_id, 'tenant_demo_001');
   assert.equal(fetched.status, 200);
   assert.deepEqual(await fetched.json(), payment);
 });
@@ -282,6 +311,46 @@ test('rejects changed idempotency input, a duplicate sale, and invalid requests'
   assert.equal(getCalls(), 1);
 });
 
+test('a tenant ID in the request body alone is not authorization', async (t) => {
+  const { base } = await startPayments(t);
+  const unauthenticated = await fetch(`${base}/payments`, {
+    method: 'POST', headers: { 'content-type': 'application/json', 'idempotency-key': 'k1' }, body: JSON.stringify(validPayment),
+  });
+  assert.equal(unauthenticated.status, 401);
+  assert.deepEqual(await unauthenticated.json(), { error: 'unauthenticated' });
+
+  const forgedSignature = await fetch(`${base}/payments`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'idempotency-key': 'k2', 'x-service-auth': 'tenant_demo_001.0.not-a-real-signature' },
+    body: JSON.stringify(validPayment),
+  });
+  assert.equal(forgedSignature.status, 401);
+
+  // Authenticated as a different tenant than the body claims: the signed
+  // identity wins, not the body.
+  const mismatched = await requestPayment(base, validPayment, 'k3', 'a-different-tenant');
+  assert.equal(mismatched.status, 403);
+  assert.deepEqual(await mismatched.json(), { error: 'tenant_mismatch' });
+});
+
+test('a payment cannot be read by a tenant other than its own, without revealing whether it exists', async (t) => {
+  const { base } = await startPayments(t);
+  const created = await (await requestPayment(base, validPayment)).json();
+
+  const noAuth = await fetch(`${base}/payments/${created.payment_id}`);
+  assert.equal(noAuth.status, 401);
+
+  const crossTenant = await getPayment(base, created.payment_id, 'a-different-tenant');
+  assert.equal(crossTenant.status, 404);
+
+  const unknownIdSameShape = await getPayment(base, 'payment_does-not-exist', 'a-different-tenant');
+  assert.equal(unknownIdSameShape.status, 404);
+  assert.deepEqual(await unknownIdSameShape.json(), await crossTenant.json());
+
+  const ownTenant = await getPayment(base, created.payment_id, 'tenant_demo_001');
+  assert.equal(ownTenant.status, 200);
+});
+
 test('a verified Daraja callback transitions a pending payment to succeeded or failed', async (t) => {
   const { base, client, getLastProviderRequestId } = await startPayments(t);
   const created = await (await requestPayment(base, validPayment)).json();
@@ -292,7 +361,7 @@ test('a verified Daraja callback transitions a pending payment to succeeded or f
   assert.equal(response.status, 200);
   assert.deepEqual(await response.json(), { ...created, status: 'succeeded' });
 
-  const fetched = await fetch(`${base}/payments/${created.payment_id}`);
+  const fetched = await getPayment(base, created.payment_id, 'tenant_demo_001');
   assert.equal((await fetched.json()).status, 'succeeded');
 });
 
@@ -306,7 +375,7 @@ test('callback verification failure leaves the payment pending for later reconci
   assert.equal(response.status, 202);
   assert.deepEqual(await response.json(), { status: 'pending' });
 
-  const fetched = await fetch(`${base}/payments/${created.payment_id}`);
+  const fetched = await getPayment(base, created.payment_id, 'tenant_demo_001');
   assert.equal((await fetched.json()).status, 'pending');
 });
 
@@ -357,6 +426,24 @@ test('a callback reporting an outcome that conflicts with the stored terminal st
     && entry.storedStatus === 'succeeded' && entry.verifiedStatus === 'failed'));
 });
 
+test('payouts enforce the same service-auth boundary as payments', async (t) => {
+  const { base } = await startPayments(t);
+  const unauthenticated = await fetch(`${base}/payouts`, {
+    method: 'POST', headers: { 'content-type': 'application/json', 'idempotency-key': 'k1' }, body: JSON.stringify(validPayout),
+  });
+  assert.equal(unauthenticated.status, 401);
+
+  const mismatched = await requestPayout(base, validPayout, 'k2', 'a-different-tenant');
+  assert.equal(mismatched.status, 403);
+  assert.deepEqual(await mismatched.json(), { error: 'tenant_mismatch' });
+
+  const created = await (await requestPayout(base, validPayout)).json();
+  const crossTenant = await getPayout(base, created.payout_id, 'a-different-tenant');
+  assert.equal(crossTenant.status, 404);
+  const ownTenant = await getPayout(base, created.payout_id, 'tenant_demo_001');
+  assert.equal(ownTenant.status, 200);
+});
+
 test('creates and returns a pending payout attempt, dispatched via B2C', async (t) => {
   const { base, getB2CCalls } = await startPayments(t);
   const created = await requestPayout(base, validPayout);
@@ -368,7 +455,7 @@ test('creates and returns a pending payout attempt, dispatched via B2C', async (
     commission_run_id: 'commission_run_demo_001', amount_minor: 2500, currency: 'KES', status: 'pending',
   });
   assert.equal(getB2CCalls(), 1);
-  const fetched = await fetch(`${base}/payouts/${payout.payout_id}`);
+  const fetched = await getPayout(base, payout.payout_id, 'tenant_demo_001');
   assert.equal(fetched.status, 200);
   assert.deepEqual(await fetched.json(), payout);
 });
@@ -429,7 +516,7 @@ test('payout callback verification failure leaves it pending; unknown/malformed 
   const pending = await postPayoutCallback(base, providerRequestId);
   assert.equal(pending.status, 202);
   assert.deepEqual(await pending.json(), { status: 'pending' });
-  assert.equal((await (await fetch(`${base}/payouts/${created.payout_id}`)).json()).status, 'pending');
+  assert.equal((await (await getPayout(base, created.payout_id, 'tenant_demo_001')).json()).status, 'pending');
 
   const unknown = await postPayoutCallback(base, 'unknown-conversation-id');
   assert.equal(unknown.status, 404);
