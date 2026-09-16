@@ -68,9 +68,9 @@ data "aws_iam_policy_document" "github_actions_permissions" {
   }
 
   statement {
-    sid       = "PassRoleToECS"
-    effect    = "Allow"
-    actions   = ["iam:PassRole"]
+    sid     = "PassRoleToECS"
+    effect  = "Allow"
+    actions = ["iam:PassRole"]
     resources = [
       aws_iam_role.payments_execution.arn,
       aws_iam_role.payments_task.arn,
@@ -149,6 +149,7 @@ data "aws_iam_policy_document" "github_actions_permissions" {
       "secretsmanager:DescribeSecret",
       "secretsmanager:GetSecretValue",
       "secretsmanager:ListSecretVersionIds",
+      "secretsmanager:GetResourcePolicy",
     ]
     resources = ["arn:aws:secretsmanager:us-east-2:${local.account_id}:secret:${local.name_prefix}/*"]
   }

@@ -164,6 +164,7 @@ data "aws_iam_policy_document" "github_apply_permissions" {
       "secretsmanager:TagResource",
       "secretsmanager:UntagResource",
       "secretsmanager:ListSecretVersionIds",
+      "secretsmanager:GetResourcePolicy",
     ]
     resources = ["arn:aws:secretsmanager:us-east-2:${local.account_id}:secret:${local.name_prefix}/*"]
   }

@@ -2,10 +2,10 @@ resource "aws_ecs_task_definition" "payments" {
   family                   = "${local.name_prefix}-payments"
   requires_compatibilities = ["FARGATE"]
   network_mode             = "awsvpc"
-  cpu                       = "256"
-  memory                    = "512"
-  execution_role_arn        = aws_iam_role.payments_execution.arn
-  task_role_arn              = aws_iam_role.payments_task.arn
+  cpu                      = "256"
+  memory                   = "512"
+  execution_role_arn       = aws_iam_role.payments_execution.arn
+  task_role_arn            = aws_iam_role.payments_task.arn
 
   container_definitions = jsonencode([
     {
