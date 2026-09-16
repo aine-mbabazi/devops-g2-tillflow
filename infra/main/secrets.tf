@@ -6,4 +6,7 @@ resource "aws_secretsmanager_secret" "service_auth" {
 resource "aws_secretsmanager_secret_version" "service_auth" {
   secret_id     = aws_secretsmanager_secret.service_auth.id
   secret_string = var.service_auth_secret_value
+  lifecycle {
+    ignore_changes = [secret_string]
+  }
 }
