@@ -138,6 +138,20 @@ data "aws_iam_policy_document" "github_actions_permissions" {
     ]
     resources = ["*"]
   }
+
+  # Read-only: the plan job (both pr.yml/release.yml and infra-apply.yml's
+  # plan stage) needs to refresh aws_secretsmanager_secret.service_auth and
+  # its version, but never writes to it — that's the apply role's job.
+  statement {
+    sid    = "TerraformReadSecrets"
+    effect = "Allow"
+    actions = [
+      "secretsmanager:DescribeSecret",
+      "secretsmanager:GetSecretValue",
+      "secretsmanager:ListSecretVersionIds",
+    ]
+    resources = ["arn:aws:secretsmanager:us-east-2:${local.account_id}:secret:${local.name_prefix}/*"]
+  }
 }
 
 resource "aws_iam_role_policy" "github_actions" {

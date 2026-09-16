@@ -147,6 +147,26 @@ data "aws_iam_policy_document" "github_apply_permissions" {
     ]
     resources = ["*"]
   }
+
+  # Full lifecycle for aws_secretsmanager_secret.service_auth /
+  # aws_secretsmanager_secret_version.service_auth, scoped to this group's
+  # secret prefix so the apply role can't touch anyone else's secrets.
+  statement {
+    sid    = "ManageSecrets"
+    effect = "Allow"
+    actions = [
+      "secretsmanager:CreateSecret",
+      "secretsmanager:DescribeSecret",
+      "secretsmanager:GetSecretValue",
+      "secretsmanager:PutSecretValue",
+      "secretsmanager:UpdateSecret",
+      "secretsmanager:DeleteSecret",
+      "secretsmanager:TagResource",
+      "secretsmanager:UntagResource",
+      "secretsmanager:ListSecretVersionIds",
+    ]
+    resources = ["arn:aws:secretsmanager:us-east-2:${local.account_id}:secret:${local.name_prefix}/*"]
+  }
 }
 
 resource "aws_iam_role_policy" "github_actions_apply" {
