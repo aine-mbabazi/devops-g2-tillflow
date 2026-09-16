@@ -45,8 +45,10 @@ jobs:
         run: terraform init
 
       - name: Terraform plan
+        env:
+          TF_VAR_service_auth_secret_value: ${{ secrets.TF_VAR_SERVICE_AUTH_SECRET_VALUE }}
         run: terraform plan -out=tfplan -input=false
-
+     
       - name: Show plan
         run: terraform show -no-color tfplan >> "$GITHUB_STEP_SUMMARY"
 
@@ -98,4 +100,6 @@ jobs:
       # reviewer approved is exactly what reaches AWS. Terraform refuses the
       # apply if state moved since the plan.
       - name: Terraform apply
+        env:
+          TF_VAR_service_auth_secret_value: ${{ secrets.TF_VAR_SERVICE_AUTH_SECRET_VALUE }}
         run: terraform apply -input=false tfplan
