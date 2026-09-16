@@ -20,6 +20,9 @@ resource "aws_ecs_task_definition" "payments" {
         { name = "PORT", value = "3001" },
         { name = "DARAJA_MODE", value = "fake" }
       ]
+      secrets = [
+        { name = "SERVICE_AUTH_SECRET", valueFrom = aws_secretsmanager_secret.service_auth.arn }
+      ]
       logConfiguration = {
         logDriver = "awslogs"
         options = {
