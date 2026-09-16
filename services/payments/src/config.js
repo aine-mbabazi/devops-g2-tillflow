@@ -17,6 +17,10 @@ export function loadConfig(env = process.env) {
   if (paymentStore === 'postgres' && !databaseUrl) {
     throw new Error('DATABASE_URL is required when PAYMENT_STORE=postgres');
   }
+  const serviceAuthSecret = env.SERVICE_AUTH_SECRET;
+  if (!serviceAuthSecret) {
+    throw new Error('SERVICE_AUTH_SECRET is required — it authenticates POS and Commission as callers');
+  }
   const sandbox = {
     consumerKey: env.DARAJA_CONSUMER_KEY,
     consumerSecret: env.DARAJA_CONSUMER_SECRET,
@@ -48,5 +52,5 @@ export function loadConfig(env = process.env) {
       if (url.protocol !== 'https:') throw new Error(`${name} must use HTTPS`);
     }
   }
-  return Object.freeze({ host, port: Number(rawPort), darajaMode, paymentStore, databaseUrl, sandbox });
+  return Object.freeze({ host, port: Number(rawPort), darajaMode, paymentStore, databaseUrl, serviceAuthSecret, sandbox });
 }

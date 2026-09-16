@@ -1,6 +1,7 @@
 import { createServer } from 'node:http';
 import { InMemoryPaymentStore, toPaymentResponse } from './payment-store.js';
 import { InMemoryPayoutStore, toPayoutResponse } from './payout-store.js';
+import { verifyServiceAuth } from '../../_shared/service-auth.js';
 
 const MAX_BODY_BYTES = 16 * 1024;
 
@@ -63,13 +64,17 @@ function validatePayout(body, idempotencyKey) {
   return { ...request, idempotencyKey: idempotencyKey.trim(), fingerprint: JSON.stringify(request) };
 }
 
-export function createApp({ darajaClient, paymentStore = new InMemoryPaymentStore(), payoutStore = new InMemoryPayoutStore(), log = () => {} }) {
+export function createApp({ darajaClient, serviceAuthSecret, paymentStore = new InMemoryPaymentStore(), payoutStore = new InMemoryPayoutStore(), log = () => {} }) {
   if (!darajaClient) throw new Error('A Daraja client is required');
+  if (!serviceAuthSecret) throw new Error('A service auth secret is required');
 
   return createServer(async (req, res) => {
     const path = req.url?.split('?')[0] ?? '';
     const isHealth = path === '/health';
     let statusCode = 500;
+    // A tenant ID in a request body or path is never authorization on its
+    // own — every tenant-scoped route below authenticates the caller first.
+    const auth = verifyServiceAuth(req.headers['x-service-auth'], serviceAuthSecret);
 
     res.on('finish', () => log({ event: 'http_request', route: describeRoute(path, req.method), statusCode }));
     if (isHealth) {
@@ -81,9 +86,11 @@ export function createApp({ darajaClient, paymentStore = new InMemoryPaymentStor
       return;
     }
     if (path === '/payments' && req.method === 'POST') {
+      if (!auth) { statusCode = 401; sendJson(res, statusCode, { error: 'unauthenticated' }); return; }
       let input;
       try { input = validatePayment(await readJsonBody(req), req.headers['idempotency-key']); } catch { input = null; }
       if (!input) { statusCode = 400; sendJson(res, statusCode, { error: 'invalid_request' }); return; }
+      if (input.tenantId !== auth.tenantId) { statusCode = 403; sendJson(res, statusCode, { error: 'tenant_mismatch' }); return; }
       const result = await paymentStore.createOrGet(input);
       if (result.kind === 'idempotency_conflict') { statusCode = 409; sendJson(res, statusCode, { error: 'idempotency_key_reused' }); return; }
       if (result.kind === 'sale_conflict') { statusCode = 409; sendJson(res, statusCode, { error: 'sale_payment_exists' }); return; }
@@ -120,14 +127,19 @@ export function createApp({ darajaClient, paymentStore = new InMemoryPaymentStor
     }
     const match = /^\/payments\/([^/]+)$/.exec(path);
     if (match && req.method === 'GET') {
+      if (!auth) { statusCode = 401; sendJson(res, statusCode, { error: 'unauthenticated' }); return; }
       const payment = await paymentStore.findById(decodeURIComponent(match[1]));
-      if (!payment) { statusCode = 404; sendJson(res, statusCode, { error: 'not_found' }); return; }
+      // A payment belonging to another tenant returns 404, identical to a
+      // truly missing one — never reveal that it exists to the wrong caller.
+      if (!payment || payment.tenantId !== auth.tenantId) { statusCode = 404; sendJson(res, statusCode, { error: 'not_found' }); return; }
       statusCode = 200; sendJson(res, statusCode, toPaymentResponse(payment)); return;
     }
     if (path === '/payouts' && req.method === 'POST') {
+      if (!auth) { statusCode = 401; sendJson(res, statusCode, { error: 'unauthenticated' }); return; }
       let input;
       try { input = validatePayout(await readJsonBody(req), req.headers['idempotency-key']); } catch { input = null; }
       if (!input) { statusCode = 400; sendJson(res, statusCode, { error: 'invalid_request' }); return; }
+      if (input.tenantId !== auth.tenantId) { statusCode = 403; sendJson(res, statusCode, { error: 'tenant_mismatch' }); return; }
       const result = await payoutStore.createOrGet(input);
       if (result.kind === 'idempotency_conflict') { statusCode = 409; sendJson(res, statusCode, { error: 'idempotency_key_reused' }); return; }
       if (result.kind === 'ledger_conflict') { statusCode = 409; sendJson(res, statusCode, { error: 'payout_already_exists' }); return; }
@@ -164,8 +176,9 @@ export function createApp({ darajaClient, paymentStore = new InMemoryPaymentStor
     }
     const payoutMatch = /^\/payouts\/([^/]+)$/.exec(path);
     if (payoutMatch && req.method === 'GET') {
+      if (!auth) { statusCode = 401; sendJson(res, statusCode, { error: 'unauthenticated' }); return; }
       const payout = await payoutStore.findById(decodeURIComponent(payoutMatch[1]));
-      if (!payout) { statusCode = 404; sendJson(res, statusCode, { error: 'not_found' }); return; }
+      if (!payout || payout.tenantId !== auth.tenantId) { statusCode = 404; sendJson(res, statusCode, { error: 'not_found' }); return; }
       statusCode = 200; sendJson(res, statusCode, toPayoutResponse(payout)); return;
     }
     if (path === '/payments') { statusCode = 405; sendJson(res, statusCode, { error: 'method_not_allowed' }, { Allow: 'POST' }); return; }
