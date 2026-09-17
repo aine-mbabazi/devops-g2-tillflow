@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'services/payments/**'
+      - 'services/_shared/**'
       - '.github/workflows/release.yml'
 
 permissions:
@@ -56,7 +57,8 @@ jobs:
           if [ -n "$DIGEST" ] && [ "$DIGEST" != "None" ]; then
             echo "Image for $IMAGE_TAG already in ECR, reusing $DIGEST"
           else
-            docker build -t "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" services/payments
+            # Built from the repo root so services/_shared is in the context.
+            docker build -f services/payments/Dockerfile -t "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" .
             docker push "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
             # Read the digest back from the pushed image rather than querying
             # the registry again, so the deploy uses the bytes just pushed.

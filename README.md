@@ -37,7 +37,8 @@ decision.
 ## Bootstrap / Deploy / Destroy
 
 ### Prerequisites
-- AWS SSO access configured (`aws sso login --sso-session assignment3-session`)
+- AWS credentials available to the default credential chain (SSO, env vars,
+  `AWS_PROFILE`, or an assumed role). CI uses OIDC — no profile needed.
 - Terraform >= 1.5
 - Docker
 - AWS CLI v2
@@ -50,13 +51,27 @@ terraform apply
 ```
 
 ### Deploy infrastructure changes
+
+Infrastructure is applied by CI, not from a laptop. Opening a PR that touches
+`infra/main/` runs `terraform plan`; merging to `main` runs the **Infra Apply**
+workflow, which plans, uploads the plan as an artifact, then waits for approval
+on the protected `production` environment before applying that exact plan file.
+
+To inspect a plan locally without applying:
 ```bash
 cd infra/main
-export AWS_PROFILE=assignment3
 terraform init
 terraform plan
-terraform apply
 ```
+
+#### One-time repository setup for the apply gate
+1. Create a `production` environment (Settings → Environments) with at least one
+   required reviewer.
+2. Set the repository variable `AWS_CI_APPLY_ROLE_ARN` to the
+   `devops-g2-ci-apply` role ARN (the `github_actions_apply_role_arn` output).
+3. The apply role itself is created by Terraform, so the very first
+   `terraform apply` that introduces it must run locally with admin
+   credentials. Every apply after that goes through CI.
 
 ### Deploy application changes (Payments)
 Automated via GitHub Actions on every merge to `main` that touches
@@ -68,9 +83,11 @@ Manual deploy (if needed):
 ```bash
 cd services/payments
 SHA=$(git rev-parse --short HEAD)
-aws ecr get-login-password --region us-east-2 | docker login --username AWS --password-stdin 240462142849.dkr.ecr.us-east-2.amazonaws.com
-docker build -t 240462142849.dkr.ecr.us-east-2.amazonaws.com/devops-g2/payments:$SHA .
-docker push 240462142849.dkr.ecr.us-east-2.amazonaws.com/devops-g2/payments:$SHA
+ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+REGISTRY="${ACCOUNT_ID}.dkr.ecr.us-east-2.amazonaws.com"
+aws ecr get-login-password --region us-east-2 | docker login --username AWS --password-stdin "${REGISTRY}"
+docker build -t "${REGISTRY}/devops-g2/payments:${SHA}" .
+docker push "${REGISTRY}/devops-g2/payments:${SHA}"
 ```
 
 ### Destroy (cost control — NAT Gateway and ALB bill continuously)
@@ -88,7 +105,8 @@ holds no ongoing cost beyond negligible S3/DynamoDB storage.
   `internal-devops-g2-alb-853726153.us-east-2.elb.amazonaws.com`
   — reachable from within the VPC only; not accessible from the public internet.
 - **Payments health check:** `http://<alb-dns>/health`
-- **ECR repository:** `240462142849.dkr.ecr.us-east-2.amazonaws.com/devops-g2/payments`
+- **ECR repository:** `<account-id>.dkr.ecr.us-east-2.amazonaws.com/devops-g2/payments`
+  (resolve `<account-id>` with `aws sts get-caller-identity --query Account --output text`)
 - **CloudWatch Logs:** `/devops-g2/payments`
 - Grafana dashboard: not yet set up (planned for G3)
 

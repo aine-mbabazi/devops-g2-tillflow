@@ -10,7 +10,7 @@ resource "aws_ecs_task_definition" "payments" {
   container_definitions = jsonencode([
     {
       name      = "payments"
-      image     = "240462142849.dkr.ecr.us-east-2.amazonaws.com/devops-g2/payments@sha256:7e23708cc0e1a412e2b471c38a1d8f4638f0bc3f45c040840cbdb3f0682f173b"
+      image     = "${local.account_id}.dkr.ecr.us-east-2.amazonaws.com/devops-g2/payments@sha256:7e23708cc0e1a412e2b471c38a1d8f4638f0bc3f45c040840cbdb3f0682f173b"
       essential = true
       portMappings = [
         { containerPort = 3001, protocol = "tcp" }
@@ -75,6 +75,10 @@ resource "aws_ecs_service" "payments" {
     container_name   = "payments"
     container_port   = 3001
   }
+  lifecycle {
+    ignore_changes = [task_definition]
+  }
+
 
   depends_on = [aws_lb_listener_rule.payments]
 

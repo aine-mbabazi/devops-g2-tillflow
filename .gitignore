@@ -6,3 +6,4 @@
 .env.*
 *.pem
 *.key
+node_modules/
