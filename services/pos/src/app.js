@@ -73,6 +73,7 @@ function validateTenantConfig(body) {
 
 function describeRoute(path, method) {
   if (path === '/health') return '/health';
+  if (path === '/ready') return '/ready';
   if (path === '/sales') return `${method} /sales`;
   if (path === '/sales/claim') return 'POST /sales/claim';
   if (/^\/sales\/[^/]+$/.test(path)) return 'GET /sales/:id';
@@ -98,6 +99,25 @@ export function createApp({ paymentsClient, serviceAuthSecret, saleStore = new I
         statusCode = 200;
         res.writeHead(statusCode, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
         res.end(req.method === 'HEAD' ? undefined : JSON.stringify({ service: 'pos', status: 'ok' }));
+      } else { statusCode = 405; sendJson(res, statusCode, { error: 'method_not_allowed' }, { Allow: 'GET, HEAD' }); }
+      return;
+    }
+
+    // Readiness: dependencies are reachable, so the ALB may send traffic.
+    // This is what the target group polls. The ECS container healthcheck
+    // stays on /health so a database blip does not replace every task.
+    if (path === '/ready') {
+      if (req.method === 'GET' || req.method === 'HEAD') {
+        try {
+          await saleStore.ping();
+          statusCode = 200;
+        } catch (error) {
+          log({ event: 'readiness_check_failed', code: error.code ?? 'UNKNOWN' });
+          statusCode = 503;
+        }
+        const body = { service: 'pos', status: statusCode === 200 ? 'ready' : 'not_ready' };
+        res.writeHead(statusCode, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+        res.end(req.method === 'HEAD' ? undefined : JSON.stringify(body));
       } else { statusCode = 405; sendJson(res, statusCode, { error: 'method_not_allowed' }, { Allow: 'GET, HEAD' }); }
       return;
     }
