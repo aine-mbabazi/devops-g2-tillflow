@@ -68,7 +68,54 @@ function validateTenantConfig(body) {
     if (!validString(attendant.attendant_id) || typeof attendant.phone !== 'string' || !/^\+[1-9]\d{6,14}$/.test(attendant.phone)) return null;
     attendants.push({ id: attendant.attendant_id.trim(), phone: attendant.phone });
   }
-  return { attendants, commissionRateBasisPoints: body.commission_rate_basis_points };
+  const attendantIds = new Set(attendants.map((attendant) => attendant.id));
+
+  // Tills are optional: an owner who has not described any is configuring a
+  // tenant that has none yet, not submitting an invalid request. Each till
+  // must reference attendants that exist in this same config, so a till can
+  // never point at an attendant the tenant does not have.
+  const tills = [];
+  if (body.tills !== undefined) {
+    if (!Array.isArray(body.tills)) return null;
+    const seenTillIds = new Set();
+    for (const till of body.tills) {
+      if (!till || typeof till !== 'object' || Array.isArray(till)) return null;
+      if (!validString(till.till_id, 128) || !validString(till.name, 256)) return null;
+      const tillId = till.till_id.trim();
+      if (seenTillIds.has(tillId)) return null;
+      seenTillIds.add(tillId);
+      if (!Array.isArray(till.attendant_ids)) return null;
+      const tillAttendantIds = [];
+      for (const rawId of till.attendant_ids) {
+        if (!validString(rawId)) return null;
+        const attendantId = rawId.trim();
+        if (!attendantIds.has(attendantId)) return null;
+        tillAttendantIds.push(attendantId);
+      }
+      tills.push({ id: tillId, name: till.name.trim(), attendantIds: tillAttendantIds });
+    }
+  }
+
+  // Roles are optional too. A role maps a tenant-scoped role name to the set
+  // of actions it may perform. Keys are normalised, permission lists are
+  // de-duplicated, and both are bounded in length so a tenant cannot smuggle
+  // an unbounded blob into the config row.
+  const roles = {};
+  if (body.roles !== undefined) {
+    if (!body.roles || typeof body.roles !== 'object' || Array.isArray(body.roles)) return null;
+    for (const [name, permissions] of Object.entries(body.roles)) {
+      if (!validString(name, 64)) return null;
+      if (!Array.isArray(permissions)) return null;
+      const unique = new Set();
+      for (const permission of permissions) {
+        if (!validString(permission, 64)) return null;
+        unique.add(permission.trim());
+      }
+      roles[name.trim()] = [...unique];
+    }
+  }
+
+  return { attendants, commissionRateBasisPoints: body.commission_rate_basis_points, tills, roles };
 }
 
 function describeRoute(path, method) {

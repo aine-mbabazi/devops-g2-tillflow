@@ -16,8 +16,11 @@ be reviewed and taken over by the Product + POS DRI going forward.
   payment's status and marks the sale paid only after checking tenant, sale,
   amount, and currency all match POS's own record; a mismatch is preserved
   (never applied) and logged as `reconcile_mismatch` for investigation.
-- Minimal tenant setup (`PUT/GET /tenants/{id}/config`) — attendants and a
-  commission rate, scoped to the owning tenant.
+- Tenant setup (`PUT/GET /tenants/{id}/config`) — attendants, a commission
+  rate, till configuration (each till names the attendants who work it), and
+  tenant-scoped roles (role name → permitted actions), all scoped to the
+  owning tenant. Tills and roles are optional; a config that omits them reads
+  back with an empty list and an empty map, so older clients keep working.
 - Paid-sales listing and claiming (`GET /sales?status=paid&commission_run_id=…`,
   `POST /sales/claim`) — the read/claim path Commission uses for its daily
   close. A sale claimed by one commission run is excluded from every other
@@ -60,11 +63,12 @@ doesn't exist yet — see "Known gaps."
 
 ## Known gaps
 
-- **No tenant setup beyond attendants + commission rate.** The brief also
-  describes "tenant-scoped roles" (who can do what within a tenant) —
-  not built. `PUT /tenants/{id}/config` is a full-replace owner action with
-  no notion of *who* the owner is beyond holding a valid service-auth token
-  for that tenant.
+- **Roles are data, not enforcement.** `PUT /tenants/{id}/config` records a
+  role → permissions map, but no route consults it yet. The roles exist so a
+  future Web frontend has something to read; wiring permission checks into
+  each POS route is the follow-up. The same caveat applies to *who* the owner
+  is: today the owner is whoever holds a valid service-auth token for the
+  tenant, not an individual user.
 - **No inbound auth story for a future Web frontend.** The service-auth
   scheme here is symmetric-secret, service-to-service (POS ↔ Payments,
   Commission ↔ POS). It doesn't address how an end-user-facing Web app
