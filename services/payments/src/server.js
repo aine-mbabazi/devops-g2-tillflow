@@ -6,9 +6,10 @@ import { InMemoryPaymentStore } from './payment-store.js';
 import { PostgresPaymentStore } from './postgres-payment-store.js';
 import { InMemoryPayoutStore } from './payout-store.js';
 import { PostgresPayoutStore } from './postgres-payout-store.js';
+import { shutdownTelemetry, traceContext } from './telemetry.js';
 
 const log = (entry) => console.log(JSON.stringify({
-  timestamp: new Date().toISOString(), service: 'payments', ...entry,
+  timestamp: new Date().toISOString(), service: 'payments', ...traceContext(), ...entry,
 }));
 
 async function start() {
@@ -19,7 +20,17 @@ async function start() {
   let pool;
   if (config.paymentStore === 'postgres') {
     const { Pool } = await import('pg');
-    pool = new Pool({ connectionString: config.databaseUrl });
+    // Both bounds matter under a network partition, where packets are dropped
+    // rather than refused: without them a query waits forever, its pooled
+    // connection is never released, and the pool drains to nothing — which
+    // would take out every endpoint, not just the one that issued the query.
+    // query_timeout is the one that tears the connection down client-side;
+    // statement_timeout would not help, since the server never receives it.
+    pool = new Pool({
+      connectionString: config.databaseUrl,
+      connectionTimeoutMillis: 2000,
+      query_timeout: 2000,
+    });
     paymentStore = new PostgresPaymentStore(pool);
     payoutStore = new PostgresPayoutStore(pool);
   }
@@ -47,9 +58,14 @@ async function start() {
       process.exit(1);
     }, 10000);
     deadline.unref();
+    // Order matters: drain in-flight requests, then flush their spans, then
+    // drop the pool. Flushing before the drain loses the traces most worth
+    // having when a shutdown goes wrong.
     server.close(() => {
       clearTimeout(deadline);
-      pool?.end().catch(() => { process.exitCode = 1; });
+      shutdownTelemetry()
+        .catch(() => {})
+        .finally(() => { pool?.end().catch(() => { process.exitCode = 1; }); });
     });
   };
   process.on('SIGTERM', shutdown);

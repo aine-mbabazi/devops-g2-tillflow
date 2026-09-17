@@ -18,8 +18,16 @@ resource "aws_ecs_task_definition" "payments" {
       environment = [
         { name = "HOST", value = "0.0.0.0" },
         { name = "PORT", value = "3001" },
-        { name = "DARAJA_MODE", value = "fake" }
+        { name = "DARAJA_MODE", value = "fake" },
+        { name = "OTEL_SERVICE_NAME", value = "payments" },
+        { name = "OTEL_EXPORTER_OTLP_ENDPOINT", value = "http://localhost:4318" },
+        { name = "OTEL_EXPORTER_OTLP_PROTOCOL", value = "http/protobuf" }
       ]
+      # No dependsOn on the collector, deliberately. Any condition — START or
+      # HEALTHY — leaves payments unable to start when the collector cannot,
+      # which is the failure it was supposed to prevent. The SDK's batch
+      # processor queues spans until the collector answers, so starting in
+      # parallel loses nothing.
       secrets = [
         { name = "SERVICE_AUTH_SECRET", valueFrom = aws_secretsmanager_secret.service_auth.arn }
       ]
@@ -40,12 +48,18 @@ resource "aws_ecs_task_definition" "payments" {
       }
     },
     {
-      name      = "adot-collector"
-      image     = "public.ecr.aws/aws-observability/aws-otel-collector:latest"
+      name  = "adot-collector"
+      image = "public.ecr.aws/aws-observability/aws-otel-collector:v0.43.3"
+      # Non-essential so a collector crash does not kill the task. With no
+      # start-order dependency either, a broken collector costs telemetry and
+      # nothing else.
       essential = false
       portMappings = [
         { containerPort = 4317, protocol = "tcp" },
         { containerPort = 4318, protocol = "tcp" }
+      ]
+      environment = [
+        { name = "AOT_CONFIG_CONTENT", value = file("${path.module}/adot-config.yaml") }
       ]
       logConfiguration = {
         logDriver = "awslogs"
@@ -54,6 +68,13 @@ resource "aws_ecs_task_definition" "payments" {
           "awslogs-region"        = "us-east-2"
           "awslogs-stream-prefix" = "adot"
         }
+      }
+      healthCheck = {
+        command     = ["CMD", "/healthcheck"]
+        interval    = 10
+        timeout     = 5
+        retries     = 3
+        startPeriod = 10
       }
     }
   ])
@@ -72,6 +93,10 @@ resource "aws_ecs_service" "payments" {
     subnets         = aws_subnet.private[*].id
     security_groups = [aws_security_group.ecs_tasks.id]
   }
+
+  # Covers container boot — image pull, OTel SDK init, then listen — before the
+  # load balancer starts counting failures against a task.
+  health_check_grace_period_seconds = 120
 
   load_balancer {
     target_group_arn = aws_lb_target_group.payments.arn

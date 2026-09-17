@@ -5,11 +5,18 @@
   "type": "module",
   "engines": { "node": ">=20" },
   "dependencies": {
+    "@opentelemetry/api": "^1.9.0",
+    "@opentelemetry/auto-instrumentations-node": "^0.56.0",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.57.0",
+    "@opentelemetry/id-generator-aws-xray": "^1.2.0",
+    "@opentelemetry/instrumentation": "^0.57.0",
+    "@opentelemetry/propagator-aws-xray": "^1.26.0",
+    "@opentelemetry/sdk-node": "^0.57.0",
     "pg": "^8.13.1"
   },
   "scripts": {
-    "start": "node src/server.js",
-    "dev": "node --watch src/server.js",
+    "start": "node --import ./src/register.js --import ./src/telemetry.js src/server.js",
+    "dev": "node --watch --import ./src/register.js --import ./src/telemetry.js src/server.js",
     "test": "node --test"
   }
 }

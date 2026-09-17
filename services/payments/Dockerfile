@@ -19,4 +19,4 @@ EXPOSE 3001
 
 USER node
 
-CMD ["node", "services/payments/src/server.js"]
+CMD ["node", "--import", "./services/payments/src/register.js", "--import", "./services/payments/src/telemetry.js", "services/payments/src/server.js"]
