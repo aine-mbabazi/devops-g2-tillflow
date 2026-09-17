@@ -1,0 +1,125 @@
+# Commission is a one-shot worker, not a long-running service: EventBridge
+# Scheduler runs this task once per day, it exits, and the next schedule
+# starts a fresh task. There is deliberately no aws_ecs_service here.
+resource "aws_ecs_task_definition" "commission" {
+  family                   = "${local.name_prefix}-commission"
+  requires_compatibilities = ["FARGATE"]
+  network_mode             = "awsvpc"
+  cpu                      = "256"
+  memory                   = "512"
+  execution_role_arn       = aws_iam_role.commission_execution.arn
+  task_role_arn            = aws_iam_role.commission_task.arn
+
+  container_definitions = jsonencode([
+    {
+      name = "commission"
+      # Placeholder digest: the release-commission workflow registers a new
+      # revision with the real digest on first deploy. Until then the
+      # scheduled task cannot pull an image, which is why the schedule below
+      # starts DISABLED.
+      image     = "${local.account_id}.dkr.ecr.us-east-2.amazonaws.com/devops-g2/commission@sha256:0000000000000000000000000000000000000000000000000000000000000000"
+      essential = true
+      environment = [
+        { name = "POS_BASE_URL", value = "http://${aws_lb.main.dns_name}" },
+        { name = "PAYMENTS_BASE_URL", value = "http://${aws_lb.main.dns_name}" },
+        { name = "TENANT_IDS", value = var.tenant_ids },
+        { name = "LEDGER_STORE", value = "memory" },
+      ]
+      secrets = [
+        { name = "SERVICE_AUTH_SECRET", valueFrom = aws_secretsmanager_secret.service_auth.arn }
+      ]
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          "awslogs-group"         = aws_cloudwatch_log_group.commission.name
+          "awslogs-region"        = "us-east-2"
+          "awslogs-stream-prefix" = "commission"
+        }
+      }
+    },
+  ])
+
+  tags = merge(local.common_tags, { service = "commission" })
+
+  # The release workflow registers a new revision with the real image digest.
+  # Without this, a later terraform apply would make the placeholder revision
+  # the latest again and break the deployed image.
+  lifecycle {
+    ignore_changes = [container_definitions]
+  }
+}
+
+# EventBridge Scheduler runs the worker once per day. 02:00 UTC is 05:00 EAT,
+# which leaves over an hour of headroom before the SLO's 06:30 EAT terminal
+# deadline. A retry of the same schedule reuses the same commissionRunId
+# (derived from the UTC date in run.js), so a second attempt cannot double-pay.
+resource "aws_scheduler_schedule" "commission_daily" {
+  name        = "${local.name_prefix}-commission-daily"
+  description = "Commission daily close, once per day at 02:00 UTC (05:00 EAT)"
+  state       = "DISABLED" # enable after the first image is pushed to ECR
+
+  schedule_expression          = "cron(0 2 * * ? *)"
+  schedule_expression_timezone = "UTC"
+
+  flexible_time_window {
+    mode = "OFF"
+  }
+
+  target {
+    arn      = aws_ecs_cluster.main.arn
+    role_arn = aws_iam_role.commission_scheduler.arn
+
+    ecs_parameters {
+      # Family ARN (no revision) so the schedule always runs the latest
+      # ACTIVE revision the release workflow registered.
+      task_definition_arn = aws_ecs_task_definition.commission.arn_without_revision
+      launch_type         = "FARGATE"
+
+      network_configuration {
+        subnets          = aws_subnet.private[*].id
+        security_groups  = [aws_security_group.ecs_tasks.id]
+        assign_public_ip = false
+      }
+    }
+
+    retry_policy {
+      maximum_retry_attempts       = 2
+      maximum_event_age_in_seconds = 3600
+    }
+  }
+}
+
+# Scheduler needs its own role to call ecs:RunTask and pass the task's roles
+# to the task it starts. This is distinct from the CI deploy role.
+resource "aws_iam_role" "commission_scheduler" {
+  name = "${local.name_prefix}-commission-scheduler"
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Principal = { Service = "scheduler.amazonaws.com" }
+      Action    = "sts:AssumeRole"
+    }]
+  })
+  tags = merge(local.common_tags, { service = "commission" })
+}
+
+resource "aws_iam_role_policy" "commission_scheduler" {
+  name = "${local.name_prefix}-commission-scheduler"
+  role = aws_iam_role.commission_scheduler.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = "ecs:RunTask"
+        Resource = ["${aws_ecs_task_definition.commission.arn_without_revision}:*"]
+      },
+      {
+        Effect   = "Allow"
+        Action   = "iam:PassRole"
+        Resource = [aws_iam_role.commission_execution.arn, aws_iam_role.commission_task.arn]
+      },
+    ]
+  })
+}
