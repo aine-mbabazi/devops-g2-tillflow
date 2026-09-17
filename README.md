@@ -112,8 +112,9 @@ holds no ongoing cost beyond negligible S3/DynamoDB storage.
 
 ## Demo script
 
-_(To be filled in at G2 — steps to walk through a live sale -> payment ->
-commission flow.)_
+See [`docs/demo-script.md`](docs/demo-script.md) for the full walkthrough:
+tenant setup, sale (with idempotency replay), pay, reconcile, and commission
+claim, with paste-ready commands and expected responses.
 
 ## Cost
 
