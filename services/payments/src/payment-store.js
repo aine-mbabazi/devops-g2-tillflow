@@ -26,6 +26,14 @@ export class InMemoryPaymentStore {
   ping() {}
 
   findById(id) { return this.#byId.get(id) ?? null; }
+  findByProviderRequestId(id) { return [...this.#byId.values()].find((payment) => payment.providerRequestId === id) ?? null; }
+
+  transition(id, status) {
+    const payment = this.#byId.get(id);
+    if (!payment) return null;
+    if (payment.status === 'pending') payment.status = status;
+    return payment;
+  }
 
   attachProviderRequest(id, providerRequestId) {
     const payment = this.#byId.get(id);

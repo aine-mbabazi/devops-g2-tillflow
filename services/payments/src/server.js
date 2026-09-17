@@ -4,6 +4,8 @@ import { FakeDarajaClient } from './daraja/fake-client.js';
 import { DarajaSandboxClient } from './daraja/sandbox-client.js';
 import { InMemoryPaymentStore } from './payment-store.js';
 import { PostgresPaymentStore } from './postgres-payment-store.js';
+import { InMemoryPayoutStore } from './payout-store.js';
+import { PostgresPayoutStore } from './postgres-payout-store.js';
 import { shutdownTelemetry, traceContext } from './telemetry.js';
 
 const log = (entry) => console.log(JSON.stringify({
@@ -14,6 +16,7 @@ async function start() {
   try {
   const config = loadConfig();
   let paymentStore = new InMemoryPaymentStore();
+  let payoutStore = new InMemoryPayoutStore();
   let pool;
   if (config.paymentStore === 'postgres') {
     const { Pool } = await import('pg');
@@ -29,17 +32,20 @@ async function start() {
       query_timeout: 2000,
     });
     paymentStore = new PostgresPaymentStore(pool);
+    payoutStore = new PostgresPayoutStore(pool);
   }
   const darajaClient = config.darajaMode === 'sandbox'
     ? new DarajaSandboxClient(config.sandbox)
     : new FakeDarajaClient();
-  const server = createApp({ darajaClient, paymentStore, log });
+  const server = createApp({ darajaClient, serviceAuthSecret: config.serviceAuthSecret, paymentStore, payoutStore, log });
   server.on('error', (error) => {
     log({ event: 'server_error', code: error.code ?? 'UNKNOWN' });
     process.exitCode = 1;
   });
   server.listen(config.port, config.host, () => {
-    log({ event: 'listening', ...config });
+    // Never spread the whole config: it carries SERVICE_AUTH_SECRET,
+    // DATABASE_URL, and Daraja sandbox credentials.
+    log({ event: 'listening', host: config.host, port: config.port, darajaMode: config.darajaMode, paymentStore: config.paymentStore });
   });
 
   let stopping = false;
