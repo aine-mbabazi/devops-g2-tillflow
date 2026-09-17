@@ -308,3 +308,43 @@ test('claiming a sale for a commission run excludes it from future runs, but kee
   });
   assert.equal(reclaim.status, 204);
 });
+
+test('/ready reports ready when the store pings, and not_ready when it throws', async (t) => {
+  const { baseUrl } = await startPaymentsServer(t);
+
+  // Happy path: the in-memory store always pings successfully.
+  const { base } = await startPos(t, baseUrl);
+  const ready = await fetch(`${base}/ready`);
+  assert.equal(ready.status, 200);
+  assert.deepEqual(await ready.json(), { service: 'pos', status: 'ready' });
+
+  // Liveness must stay green even when the store is unreachable: a database
+  // blip must not cause the ALB to replace every task.
+  const health = await fetch(`${base}/health`);
+  assert.equal(health.status, 200);
+
+  // A store whose ping rejects must turn /ready into a 503, while /health
+  // remains 200 — this is the whole point of splitting the two endpoints.
+  const brokenStore = new InMemorySaleStore();
+  brokenStore.ping = async () => { const error = new Error('db down'); error.code = 'ECONNREFUSED'; throw error; };
+  const entries = [];
+  const server = createApp({
+    paymentsClient: new PaymentsClient({ baseUrl, serviceAuthSecret: TEST_SECRET }),
+    serviceAuthSecret: TEST_SECRET,
+    saleStore: brokenStore,
+    log: (entry) => entries.push(entry),
+  });
+  t.after(() => new Promise((resolve) => { server.close(resolve); server.closeAllConnections(); }));
+  server.listen(0, '127.0.0.1');
+  await once(server, 'listening');
+  const brokenBase = `http://127.0.0.1:${server.address().port}`;
+
+  const notReady = await fetch(`${brokenBase}/ready`);
+  assert.equal(notReady.status, 503);
+  assert.deepEqual(await notReady.json(), { service: 'pos', status: 'not_ready' });
+
+  const stillAlive = await fetch(`${brokenBase}/health`);
+  assert.equal(stillAlive.status, 200);
+
+  assert.ok(entries.some((entry) => entry.event === 'readiness_check_failed'));
+});

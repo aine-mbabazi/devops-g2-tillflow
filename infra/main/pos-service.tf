@@ -5,8 +5,11 @@ resource "aws_lb_target_group" "pos" {
   vpc_id      = aws_vpc.main.id
   target_type = "ip"
 
+  # Polls /ready, not /health: traffic should only reach a task whose store
+  # is reachable. The ECS container healthcheck stays on /health so a
+  # database blip does not replace every task.
   health_check {
-    path                = "/health"
+    path                = "/ready"
     protocol            = "HTTP"
     matcher             = "200"
     interval            = 30

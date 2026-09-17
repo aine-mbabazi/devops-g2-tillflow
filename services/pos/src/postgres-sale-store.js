@@ -50,6 +50,12 @@ export class PostgresSaleStore {
       : { kind: 'idempotency_conflict' };
   }
 
+  // Readiness probe: a single round-trip to Postgres. Throws if the pool
+  // cannot reach the database, which the /ready handler turns into a 503.
+  async ping() {
+    await this.pool.query('SELECT 1');
+  }
+
   async findById(saleId) {
     const result = await this.pool.query(`SELECT ${fields} FROM pos.sales WHERE sale_id = $1`, [saleId]);
     return result.rows[0] ? saleFromRow(result.rows[0]) : null;
