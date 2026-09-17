@@ -21,7 +21,7 @@ locals {
   common_tags = {
     group       = "g2"
     owner       = "aine-mbabazi"
-    environment = "capstone"
+    environment = "prod"
     managed-by  = "terraform"
     capstone    = "tillflow"
   }

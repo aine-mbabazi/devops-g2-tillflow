@@ -14,17 +14,47 @@ for binary in aws jq; do
   command -v "$binary" >/dev/null || { echo "error: $binary is required" >&2; exit 2; }
 done
 
-# get-resources only returns resources carrying at least one tag, so a wholly
-# untagged resource is invisible here. Cross-check against `terraform state
-# list` when a resource you expect is absent from the report.
-resources="$(aws resourcegroupstaggingapi get-resources \
-  --region "$REGION" \
-  --tag-filters "Key=capstone,Values=tillflow" \
-  --output json)"
+# Deliberately no --tag-filters. Filtering on capstone=tillflow would have made
+# three of the checks below unfireable: a resource missing that tag, or holding
+# a wrong value for it, never enters the result set, so neither the missing-key
+# check, the bad-value check, nor the name check could ever see the resources
+# most likely to be wrong.
+#
+# Scope is decided after the fetch instead, by name prefix OR by our identifying
+# tags, so a resource that is ours by name but mis-tagged still gets audited,
+# and so does one that is ours by tag but misnamed.
+#
+# Still invisible either way: a resource with no tags at all and no prefix in
+# its ARN. get-resources only returns tagged resources, so cross-check against
+# `terraform state list` if something you expect is absent from the report.
+pages=()
+token=""
+while :; do
+  if [[ -n "$token" ]]; then
+    page="$(aws resourcegroupstaggingapi get-resources --region "$REGION" --pagination-token "$token" --output json)"
+  else
+    page="$(aws resourcegroupstaggingapi get-resources --region "$REGION" --output json)"
+  fi
+  pages+=("$page")
+  # A page caps at 100 resources; without following the token the audit would
+  # silently pass by only ever looking at the first hundred.
+  token="$(jq -r '.PaginationToken // ""' <<<"$page")"
+  [[ -z "$token" ]] && break
+done
+
+resources="$(printf '%s\n' "${pages[@]}" | jq -s --arg prefix "$PREFIX" '
+  {ResourceTagMappingList: (
+    map(.ResourceTagMappingList) | add
+    | map(select(
+        (.ResourceARN | contains($prefix))
+        or ((.Tags // []) | any(.Key == "capstone" and .Value == "tillflow"))
+        or ((.Tags // []) | any(.Key == "group" and .Value == "g2"))
+      ))
+  )}')"
 
 total="$(jq -r '.ResourceTagMappingList | length' <<<"$resources")"
 if [[ "$total" -eq 0 ]]; then
-  echo "error: no resources tagged capstone=tillflow in $REGION — nothing to audit" >&2
+  echo "error: no resources matching \"$PREFIX\" or our tags in $REGION — nothing to audit" >&2
   exit 2
 fi
 
