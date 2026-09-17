@@ -12,6 +12,12 @@ permissions:
   contents: read
   id-token: write
 
+# Never cancel: a cancelled run can leave the service mid-rollout with the
+# deployment circuit breaker still watching it.
+concurrency:
+  group: release-payments
+  cancel-in-progress: false
+
 jobs:
   build-and-deploy:
     name: Build, push, and deploy Payments
@@ -36,9 +42,30 @@ jobs:
           ECR_REPOSITORY: devops-g2/payments
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          docker build -f services/payments/Dockerfile -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-          DIGEST=$(aws ecr describe-images --repository-name $ECR_REPOSITORY --image-ids imageTag=$IMAGE_TAG --region us-east-2 --query 'imageDetails[0].imageDigest' --output text)
+          set -euo pipefail
+          # The ECR repository is IMMUTABLE, so re-running this workflow on a
+          # commit that was already built fails the push. Reuse the existing
+          # image instead: same commit, same digest, so the deploy below is
+          # still exact.
+          DIGEST="$(aws ecr describe-images \
+            --repository-name "$ECR_REPOSITORY" \
+            --image-ids imageTag="$IMAGE_TAG" \
+            --region us-east-2 \
+            --query 'imageDetails[0].imageDigest' \
+            --output text 2>/dev/null || true)"
+
+          if [ -n "$DIGEST" ] && [ "$DIGEST" != "None" ]; then
+            echo "Image for $IMAGE_TAG already in ECR, reusing $DIGEST"
+          else
+            # Built from the repo root so services/_shared is in the context.
+            docker build -f services/payments/Dockerfile -t "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" .
+            docker push "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+            # Read the digest back from the pushed image rather than querying
+            # the registry again, so the deploy uses the bytes just pushed.
+            DIGEST="$(docker inspect --format='{{index .RepoDigests 0}}' \
+              "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" | cut -d@ -f2)"
+          fi
+
           echo "image=$ECR_REGISTRY/$ECR_REPOSITORY@$DIGEST" >> "$GITHUB_OUTPUT"
 
       - name: Download current task definition

@@ -1,0 +1,28 @@
+# Accepted risk, per the capstone brief: each entry carries an owner, a reason
+# and an expiry. Anything fixable is fixed in the Terraform instead of listed
+# here. Both entries expire on 2026-10-15 so they come back for a decision
+# rather than lapsing into permanent silence.
+misconfigurations:
+  - id: AVD-AWS-0054
+    paths:
+      - "main/alb.tf"
+    expired_at: 2026-10-15
+    statement: >-
+      ALB listener is HTTP, not HTTPS. Owner: @mercykilonzo. The ALB is
+      internal and its only client is API Gateway, which terminates TLS at the
+      edge; this traffic never leaves the VPC. Terminating TLS again at the ALB
+      needs an ACM certificate for an internal hostname, which is not in scope
+      for G1. Revisit if anything other than API Gateway is ever allowed to
+      call the ALB.
+
+  - id: AVD-AWS-0104
+    paths:
+      - "main/ecs.tf"
+    expired_at: 2026-10-15
+    statement: >-
+      ECS task security group allows unrestricted egress. Owner: @mercykilonzo.
+      Tasks must reach ECR, the Daraja sandbox and CloudWatch/X-Ray, and the
+      only egress path is the NAT gateway. The real fix is VPC endpoints for
+      the AWS services plus a narrowed rule for Daraja, which belongs with the
+      G3 networking work. The matching finding on the ALB security group was
+      fixed rather than accepted.
