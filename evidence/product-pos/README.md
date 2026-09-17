@@ -23,6 +23,10 @@ be reviewed and taken over by the Product + POS DRI going forward.
   close. A sale claimed by one commission run is excluded from every other
   run's listing (but stays visible to a retry of the same run), so the same
   sale can never be paid commission on twice across separate daily closes.
+- Split liveness/readiness (`GET /health`, `GET /ready`) — `/health` is
+  dependency-free and probes the container; `/ready` pings the sale store
+  and is what the ALB target group polls, so a store blip drains traffic
+  without replacing every task.
 - Every tenant-scoped route requires the same signed `X-Service-Auth` token
   as Payments (`services/_shared/service-auth.js`) — a tenant ID in a
   request body or query string is never authorization on its own.
@@ -35,13 +39,27 @@ be reviewed and taken over by the Product + POS DRI going forward.
 ## Reproduction commands
 
 ```bash
-cd services/pos && npm test   # 12/12
+cd services/pos && npm test   # 13/13
 ```
 
 No external services required — the suite spins up a live Payments server
 (backed by the deterministic fake Daraja adapter) and drives POS against it
 over real HTTP, so the full sale -> STK -> callback -> reconcile -> paid
 flow is proven end to end, not mocked.
+
+### Manual reproduction of the four G2 demo scenarios
+
+The end-to-end walkthrough (tenant setup, sale, duplicate, pay, reconcile,
+claim) lives in [`docs/demo-script.md`](../../docs/demo-script.md) with
+paste-ready `curl` commands. The four scenarios below map to the specific
+assertions a reviewer should see when running it:
+
+| # | Scenario | Command | Expected |
+|---|----------|---------|----------|
+| 1 | Happy sale -> paid | steps 1-5 of the demo script | `201` on create (`amount_minor` = sum of `quantity * unit_price_minor`); `202` on pay; `status: "paid"` after reconcile |
+| 2 | Duplicate sale | step 3 (replay step 2's `idempotency-key`) | `200` (not `201`), same `sale_id`, no second row |
+| 3 | Payment timeout -> reconcile | step 4 then step 5 before the callback fires | `202` on pay; `status: "unpaid"` on the early reconcile; `status: "paid"` only after the callback |
+| 4 | Commission claim | step 6 | list returns the paid sale; claim returns `204`; replaying the claim is a no-op |
 
 ## Acceptance scenarios → tests (`docs/payment-contract.md`)
 
@@ -74,5 +92,8 @@ doesn't exist yet — see "Known gaps."
   exist and have migrations, but nothing in `infra/` provisions the
   database itself (Platform + delivery) — every deployed environment still
   runs `POS_STORE=memory`.
-- **Not deployed.** No `infra/` changes accompany this — no ECS service,
-  ECR repo, or CI/CD stage exists for `services/pos/` yet.
+- **POS is deployed, but has no reachable entry point yet.** `infra/main/`
+  provisions the ECR repo, task definition, ECS service, target group, and
+  listener rule, and `.github/workflows/release-pos.yml` builds and deploys
+  on changes under `services/pos/**`. The ALB is internal-only — public
+  access via API Gateway + VPC Link is planned for G3.
