@@ -19,13 +19,14 @@ resource "aws_ecs_task_definition" "pos" {
         { name = "HOST", value = "0.0.0.0" },
         { name = "PORT", value = "3002" },
         { name = "PAYMENTS_BASE_URL", value = "http://${aws_lb.main.dns_name}" },
-        { name = "POS_STORE", value = "memory" },
+        { name = "POS_STORE", value = "postgres" },
         { name = "OTEL_SERVICE_NAME", value = "pos" },
         { name = "OTEL_EXPORTER_OTLP_ENDPOINT", value = "http://localhost:4318" },
         { name = "OTEL_EXPORTER_OTLP_PROTOCOL", value = "http/protobuf" }
       ]
       secrets = [
-        { name = "SERVICE_AUTH_SECRET", valueFrom = aws_secretsmanager_secret.service_auth.arn }
+        { name = "SERVICE_AUTH_SECRET", valueFrom = aws_secretsmanager_secret.service_auth.arn },
+        { name = "DATABASE_URL", valueFrom = aws_secretsmanager_secret.database_url.arn }
       ]
       logConfiguration = {
         logDriver = "awslogs"
