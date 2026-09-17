@@ -24,6 +24,8 @@ data "aws_iam_policy_document" "github_actions_assume" {
       values = [
         "aine-mbabazi/devops-g2-tillflow/.github/workflows/pr.yml@*",
         "aine-mbabazi/devops-g2-tillflow/.github/workflows/release.yml@*",
+        "aine-mbabazi/devops-g2-tillflow/.github/workflows/release-pos.yml@*",
+        "aine-mbabazi/devops-g2-tillflow/.github/workflows/release-commission.yml@*",
         # Infra Apply's plan job. Its apply job assumes devops-g2-ci-apply
         # instead; planning stays on this read-only role.
         "aine-mbabazi/devops-g2-tillflow/.github/workflows/infra-apply.yml@*",
@@ -74,6 +76,8 @@ data "aws_iam_policy_document" "github_actions_permissions" {
     resources = [
       aws_iam_role.payments_execution.arn,
       aws_iam_role.payments_task.arn,
+      aws_iam_role.pos_execution.arn,
+      aws_iam_role.pos_task.arn,
     ]
   }
 
