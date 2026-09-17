@@ -1,5 +1,6 @@
 import { createApp } from './app.js';
 import { loadConfig } from './config.js';
+import { shutdownTelemetry, traceContext } from './telemetry.js';
 import { PaymentsClient } from './payments-client.js';
 import { InMemorySaleStore } from './sale-store.js';
 import { PostgresSaleStore } from './postgres-sale-store.js';
@@ -7,7 +8,7 @@ import { InMemoryTenantStore } from './tenant-store.js';
 import { PostgresTenantStore } from './postgres-tenant-store.js';
 
 const log = (entry) => console.log(JSON.stringify({
-  timestamp: new Date().toISOString(), service: 'pos', ...entry,
+  timestamp: new Date().toISOString(), service: 'pos', ...traceContext(), ...entry,
 }));
 
 async function start() {
@@ -41,7 +42,11 @@ async function start() {
       deadline.unref();
       server.close(() => {
         clearTimeout(deadline);
-        pool?.end().catch(() => { process.exitCode = 1; });
+        // Flush buffered spans before the process exits; a collector outage
+        // must not prevent shutdown, so a failure is logged and ignored.
+        shutdownTelemetry()
+          .catch((error) => log({ event: 'telemetry_shutdown_failed', message: error.message }))
+          .finally(() => pool?.end().catch(() => { process.exitCode = 1; }));
       });
     };
     process.on('SIGTERM', shutdown);
