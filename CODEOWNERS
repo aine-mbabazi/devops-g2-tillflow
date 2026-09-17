@@ -1,19 +1,25 @@
 # services
-/services/web/            @aine-mbabazi
-/services/pos/             @aine-mbabazi
-/services/payments/        @cheshari-pearl
-/services/commission/      @cheshari-pearl
-/services/_shared/         @aine-mbabazi @cheshari-pearl
+/services/web/          @aine-mbabazi
+/services/pos/          @aine-mbabazi
+/services/payments/     @cheshari-pearl
+/services/commission/   @cheshari-pearl
+/services/_shared/      @aine-mbabazi @cheshari-pearl @mercykilonzo
 
 # infra & delivery
-/infra/                    @aine-mbabazi
-/.github/workflows/        @aine-mbabazi
+/infra/                 @aine-mbabazi
+/.github/workflows/     @mercykilonzo @aine-mbabazi
 
 # Shared documentation; required review is configured in repository rules.
-/docs/                     @aine-mbabazi @cheshari-pearl
+/docs/                  @aine-mbabazi @cheshari-pearl @mercykilonzo
 
 # Specific rules follow the general docs rule because the last match wins.
 # operations
-/docs/slo-error-budgets.md   @cheshari-pearl
-/docs/runbook.md              @cheshari-pearl
-/docs/scar-log.md             @cheshari-pearl
+/docs/slo-error-budgets.md  @mercykilonzo
+/docs/runbook.md            @mercykilonzo
+/docs/scar-log.md           @mercykilonzo
+
+# evidence - each DRI owns their area's file
+/evidence/product-pos/           @aine-mbabazi
+/evidence/platform-delivery/     @aine-mbabazi
+/evidence/payments-integrity/    @cheshari-pearl
+/evidence/reliability-operations/ @mercykilonzo
