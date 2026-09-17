@@ -95,8 +95,16 @@ resource "aws_iam_role_policy_attachment" "commission_task_cloudwatch" {
 }
 data "aws_iam_policy_document" "read_service_auth_secret" {
   statement {
+    sid       = "ReadServiceAuth"
     actions   = ["secretsmanager:GetSecretValue"]
     resources = [aws_secretsmanager_secret.service_auth.arn]
+  }
+  # The task definitions pass DATABASE_URL from this secret as a valueFrom,
+  # so the execution role must be able to read it before the container starts.
+  statement {
+    sid       = "ReadDatabaseUrl"
+    actions   = ["secretsmanager:GetSecretValue"]
+    resources = [aws_secretsmanager_secret.database_url.arn]
   }
 }
 
@@ -109,5 +117,11 @@ resource "aws_iam_role_policy" "payments_execution_secrets" {
 resource "aws_iam_role_policy" "pos_execution_secrets" {
   name   = "${local.name_prefix}-pos-exec-secrets"
   role   = aws_iam_role.pos_execution.id
+  policy = data.aws_iam_policy_document.read_service_auth_secret.json
+}
+
+resource "aws_iam_role_policy" "commission_execution_secrets" {
+  name   = "${local.name_prefix}-commission-exec-secrets"
+  role   = aws_iam_role.commission_execution.id
   policy = data.aws_iam_policy_document.read_service_auth_secret.json
 }

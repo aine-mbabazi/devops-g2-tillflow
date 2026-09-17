@@ -10,6 +10,7 @@ COPY services/payments/package.json services/payments/package-lock.json ./servic
 RUN npm install --prefix services/payments --omit=dev
 
 COPY services/payments/src ./services/payments/src
+COPY services/payments/migrations ./services/payments/migrations
 COPY services/_shared ./services/_shared
 
 ENV HOST=0.0.0.0
