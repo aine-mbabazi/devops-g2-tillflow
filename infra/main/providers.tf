@@ -8,8 +8,14 @@ terraform {
   }
 }
 
+# default_tags is the safety net: a new taggable resource carries the required
+# tags even if whoever adds it forgets to merge local.common_tags.
 provider "aws" {
-  region  = "us-east-2"
+  region = "us-east-2"
+
+  default_tags {
+    tags = local.common_tags
+  }
 }
 
 data "aws_caller_identity" "current" {}
@@ -25,7 +31,7 @@ locals {
   common_tags = {
     group       = "g2"
     owner       = "aine-mbabazi"
-    environment = "capstone"
+    environment = "prod"
     managed-by  = "terraform"
     capstone    = "tillflow"
   }

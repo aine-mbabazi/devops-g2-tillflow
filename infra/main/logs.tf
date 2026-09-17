@@ -4,3 +4,8 @@ resource "aws_cloudwatch_log_group" "payments" {
 
   tags = merge(local.common_tags, { service = "payments" })
 }
+resource "aws_cloudwatch_log_group" "pos" {
+  name              = "/${local.name_prefix}/pos"
+  retention_in_days = 14
+  tags              = merge(local.common_tags, { service = "pos" })
+}

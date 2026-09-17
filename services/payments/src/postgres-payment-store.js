@@ -26,6 +26,12 @@ export class PostgresPaymentStore {
     this.pool = pool;
   }
 
+  // Takes a connection from the pool rather than trusting pool state: an
+  // exhausted or unreachable pool must fail readiness, not pass it.
+  async ping() {
+    await this.pool.query('SELECT 1');
+  }
+
   async createOrGet(input) {
     const paymentId = `payment_${randomUUID()}`;
     try {

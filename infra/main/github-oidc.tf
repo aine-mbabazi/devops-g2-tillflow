@@ -68,9 +68,9 @@ data "aws_iam_policy_document" "github_actions_permissions" {
   }
 
   statement {
-    sid       = "PassRoleToECS"
-    effect    = "Allow"
-    actions   = ["iam:PassRole"]
+    sid     = "PassRoleToECS"
+    effect  = "Allow"
+    actions = ["iam:PassRole"]
     resources = [
       aws_iam_role.payments_execution.arn,
       aws_iam_role.payments_task.arn,
@@ -137,6 +137,21 @@ data "aws_iam_policy_document" "github_actions_permissions" {
       "s3:GetLifecycleConfiguration",
     ]
     resources = ["*"]
+  }
+
+  # Read-only: the plan job (both pr.yml/release.yml and infra-apply.yml's
+  # plan stage) needs to refresh aws_secretsmanager_secret.service_auth and
+  # its version, but never writes to it — that's the apply role's job.
+  statement {
+    sid    = "TerraformReadSecrets"
+    effect = "Allow"
+    actions = [
+      "secretsmanager:DescribeSecret",
+      "secretsmanager:GetSecretValue",
+      "secretsmanager:ListSecretVersionIds",
+      "secretsmanager:GetResourcePolicy",
+    ]
+    resources = ["arn:aws:secretsmanager:us-east-2:${local.account_id}:secret:${local.name_prefix}/*"]
   }
 }
 
