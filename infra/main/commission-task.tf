@@ -23,10 +23,11 @@ resource "aws_ecs_task_definition" "commission" {
         { name = "POS_BASE_URL", value = "http://${aws_lb.main.dns_name}" },
         { name = "PAYMENTS_BASE_URL", value = "http://${aws_lb.main.dns_name}" },
         { name = "TENANT_IDS", value = var.tenant_ids },
-        { name = "LEDGER_STORE", value = "memory" },
+        { name = "LEDGER_STORE", value = "postgres" },
       ]
       secrets = [
-        { name = "SERVICE_AUTH_SECRET", valueFrom = aws_secretsmanager_secret.service_auth.arn }
+        { name = "SERVICE_AUTH_SECRET", valueFrom = aws_secretsmanager_secret.service_auth.arn },
+        { name = "DATABASE_URL", valueFrom = aws_secretsmanager_secret.database_url.arn }
       ]
       logConfiguration = {
         logDriver = "awslogs"
