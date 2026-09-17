@@ -133,6 +133,8 @@ data "aws_iam_policy_document" "github_actions_permissions" {
       "logs:ListTagsForResource",
       "dynamodb:DescribeTable",
       "dynamodb:ListTagsOfResource",
+      "rds:Describe*",
+      "rds:ListTagsForResource",
       "kms:DescribeKey",
       "kms:GetKeyPolicy",
       "kms:ListResourceTags",

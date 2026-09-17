@@ -19,6 +19,7 @@ resource "aws_ecs_task_definition" "payments" {
         { name = "HOST", value = "0.0.0.0" },
         { name = "PORT", value = "3001" },
         { name = "DARAJA_MODE", value = "fake" },
+        { name = "PAYMENT_STORE", value = "postgres" },
         { name = "OTEL_SERVICE_NAME", value = "payments" },
         { name = "OTEL_EXPORTER_OTLP_ENDPOINT", value = "http://localhost:4318" },
         { name = "OTEL_EXPORTER_OTLP_PROTOCOL", value = "http/protobuf" }
@@ -29,7 +30,8 @@ resource "aws_ecs_task_definition" "payments" {
       # processor queues spans until the collector answers, so starting in
       # parallel loses nothing.
       secrets = [
-        { name = "SERVICE_AUTH_SECRET", valueFrom = aws_secretsmanager_secret.service_auth.arn }
+        { name = "SERVICE_AUTH_SECRET", valueFrom = aws_secretsmanager_secret.service_auth.arn },
+        { name = "DATABASE_URL", valueFrom = aws_secretsmanager_secret.database_url.arn }
       ]
       logConfiguration = {
         logDriver = "awslogs"
