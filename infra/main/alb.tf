@@ -50,4 +50,6 @@ resource "aws_lb_listener" "http" {
       status_code  = "404"
     }
   }
+
+  tags = merge(local.common_tags, { service = "networking" })
 }
