@@ -125,33 +125,10 @@ data "aws_iam_policy_document" "github_apply_permissions" {
     resources = ["*"]
   }
 
-  # Enumerated rather than s3:*, which the IaC scan flags as AVD-AWS-0345. The
-  # resource scope already confines this to devops-g2-* buckets, but s3:* there
-  # still includes PutBucketPolicy and PutBucketAcl — enough to make one of our
-  # own buckets public. These are the actions the aws_s3_bucket resources in
-  # infra/ actually need.
   statement {
-    sid    = "GroupScopedBuckets"
-    effect = "Allow"
-    actions = [
-      "s3:CreateBucket",
-      "s3:DeleteBucket",
-      "s3:ListBucket",
-      "s3:GetBucketLocation",
-      "s3:GetBucketTagging",
-      "s3:PutBucketTagging",
-      "s3:GetBucketVersioning",
-      "s3:PutBucketVersioning",
-      "s3:GetEncryptionConfiguration",
-      "s3:PutEncryptionConfiguration",
-      "s3:GetBucketPublicAccessBlock",
-      "s3:PutBucketPublicAccessBlock",
-      "s3:GetLifecycleConfiguration",
-      "s3:PutLifecycleConfiguration",
-      "s3:GetObject",
-      "s3:PutObject",
-      "s3:DeleteObject",
-    ]
+    sid     = "GroupScopedBuckets"
+    effect  = "Allow"
+    actions = ["s3:*"]
     resources = [
       "arn:aws:s3:::${local.name_prefix}-*",
       "arn:aws:s3:::${local.name_prefix}-*/*",
