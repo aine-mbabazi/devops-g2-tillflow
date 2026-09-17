@@ -23,11 +23,15 @@ resource "aws_ecs_task_definition" "payments" {
         { name = "OTEL_EXPORTER_OTLP_ENDPOINT", value = "http://localhost:4318" },
         { name = "OTEL_EXPORTER_OTLP_PROTOCOL", value = "http/protobuf" }
       ]
+ feat/payments-readiness-and-telemetry
       # No dependsOn on the collector, deliberately. Any condition — START or
       # HEALTHY — leaves payments unable to start when the collector cannot,
       # which is the failure it was supposed to prevent. The SDK's batch
       # processor queues spans until the collector answers, so starting in
       # parallel loses nothing.
+      secrets = [
+        { name = "SERVICE_AUTH_SECRET", valueFrom = aws_secretsmanager_secret.service_auth.arn }
+      ]
       logConfiguration = {
         logDriver = "awslogs"
         options = {
