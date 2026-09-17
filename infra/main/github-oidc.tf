@@ -78,6 +78,8 @@ data "aws_iam_policy_document" "github_actions_permissions" {
       aws_iam_role.payments_task.arn,
       aws_iam_role.pos_execution.arn,
       aws_iam_role.pos_task.arn,
+      aws_iam_role.commission_execution.arn,
+      aws_iam_role.commission_task.arn,
     ]
   }
 
