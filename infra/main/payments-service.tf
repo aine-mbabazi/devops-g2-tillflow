@@ -5,13 +5,17 @@ resource "aws_lb_target_group" "payments" {
   vpc_id      = aws_vpc.main.id
   target_type = "ip" # required for Fargate
 
-  # Probes /ready so a task that cannot reach Postgres stops taking traffic.
-  # ECS derives task health from target health, so a sustained database outage
-  # fails every task and cycles them rather than only draining them; the
-  # service sets a health check grace period to keep that from killing a deploy
-  # started mid-outage.
+  # Liveness, not readiness. ECS derives task health from target health, so a
+  # dependency-aware probe here does not drain a task, it replaces it — and
+  # every task shares one database, so a Postgres outage fails them all
+  # together and crash-loops the service for as long as the outage lasts. At
+  # desired_count = 1 there is no healthy peer to drain to either, so pointing
+  # this at /ready would cost availability and buy nothing.
+  #
+  # /ready still exists and is still routed below, for the synthetic probe and
+  # for operators — just not for deciding whether to kill a task.
   health_check {
-    path                = "/ready"
+    path                = "/health"
     protocol            = "HTTP"
     matcher             = "200"
     interval            = 30

@@ -23,14 +23,11 @@ resource "aws_ecs_task_definition" "payments" {
         { name = "OTEL_EXPORTER_OTLP_ENDPOINT", value = "http://localhost:4318" },
         { name = "OTEL_EXPORTER_OTLP_PROTOCOL", value = "http/protobuf" }
       ]
-      # START, not HEALTHY: gating on the collector's health check would mean a
-      # collector that never goes healthy — bad IAM, slow image pull, config
-      # typo — stops payments starting at all. Ordering is all that is needed,
-      # because the SDK's batch processor queues spans until the collector
-      # answers.
-      dependsOn = [
-        { containerName = "adot-collector", condition = "START" }
-      ]
+      # No dependsOn on the collector, deliberately. Any condition — START or
+      # HEALTHY — leaves payments unable to start when the collector cannot,
+      # which is the failure it was supposed to prevent. The SDK's batch
+      # processor queues spans until the collector answers, so starting in
+      # parallel loses nothing.
       logConfiguration = {
         logDriver = "awslogs"
         options = {
@@ -50,8 +47,8 @@ resource "aws_ecs_task_definition" "payments" {
     {
       name  = "adot-collector"
       image = "public.ecr.aws/aws-observability/aws-otel-collector:v0.43.3"
-      # Non-essential so a collector crash does not kill the task. Paired with
-      # the START condition above, a broken collector costs telemetry and
+      # Non-essential so a collector crash does not kill the task. With no
+      # start-order dependency either, a broken collector costs telemetry and
       # nothing else.
       essential = false
       portMappings = [
@@ -94,9 +91,8 @@ resource "aws_ecs_service" "payments" {
     security_groups = [aws_security_group.ecs_tasks.id]
   }
 
-  # Without a grace period a deploy started while Postgres is down is killed by
-  # the load balancer before it can ever report ready, turning an outage into a
-  # crash loop.
+  # Covers container boot — image pull, OTel SDK init, then listen — before the
+  # load balancer starts counting failures against a task.
   health_check_grace_period_seconds = 120
 
   load_balancer {

@@ -28,7 +28,13 @@ const sdk = new NodeSDK({
 
 sdk.start();
 
-process.on('SIGTERM', () => { sdk.shutdown().catch(() => {}); });
+// Deliberately not a SIGTERM handler of its own: the server drains for up to
+// 10s after SIGTERM, and a handler here would tear the SDK down while those
+// requests are still producing spans. server.js calls this once the drain is
+// finished.
+export function shutdownTelemetry() {
+  return sdk.shutdown();
+}
 
 // Lets log lines join the trace they belong to. Returns nothing outside a span,
 // so log entries stay valid JSON either way.
