@@ -236,6 +236,8 @@ test('tenant configuration: an owner can set attendants and a commission rate, s
   const config = {
     commission_rate_basis_points: 1000,
     attendants: [{ attendant_id: 'attendant_demo_001', phone: '+254700000009' }],
+    tills: [{ till_id: 'till_demo_001', name: 'Front counter', attendant_ids: ['attendant_demo_001'] }],
+    roles: { owner: ['configure_tenant', 'view_reports'], attendant: ['record_sale'] },
   };
   const put = await putTenantConfig(base, 'tenant_demo_001', config);
   assert.equal(put.status, 200);
@@ -347,4 +349,42 @@ test('/ready reports ready when the store pings, and not_ready when it throws', 
   assert.equal(stillAlive.status, 200);
 
   assert.ok(entries.some((entry) => entry.event === 'readiness_check_failed'));
+});
+
+test('tenant configuration rejects tills that reference unknown attendants, duplicate tills, and malformed roles', async (t) => {
+  const { baseUrl } = await startPaymentsServer(t);
+  const { base } = await startPos(t, baseUrl);
+  const good = {
+    commission_rate_basis_points: 500,
+    attendants: [{ attendant_id: 'att_1', phone: '+254700000001' }],
+  };
+  const bad = [
+    // till references an attendant not in attendants[]
+    { ...good, tills: [{ till_id: 't1', name: 'A', attendant_ids: ['att_missing'] }] },
+    // duplicate till ids
+    { ...good, tills: [
+      { till_id: 't1', name: 'A', attendant_ids: ['att_1'] },
+      { till_id: 't1', name: 'B', attendant_ids: ['att_1'] },
+    ] },
+    // till missing a name
+    { ...good, tills: [{ till_id: 't1', attendant_ids: ['att_1'] }] },
+    // roles not an object
+    { ...good, roles: ['owner'] },
+    // a role maps to a non-array
+    { ...good, roles: { owner: 'all' } },
+    // a permission is not a non-empty string
+    { ...good, roles: { owner: [''] } },
+  ];
+  for (const [i, body] of bad.entries()) {
+    const res = await putTenantConfig(base, 'tenant_demo_001', body);
+    assert.equal(res.status, 400, `case ${i} should be 400, got ${res.status}`);
+  }
+
+  // tills and roles are optional: the minimal config still succeeds and reads
+  // back with empty tills and roles, so older clients keep working.
+  const minimal = await putTenantConfig(base, 'tenant_demo_002', good);
+  assert.equal(minimal.status, 200);
+  const body = await minimal.json();
+  assert.deepEqual(body.tills, []);
+  assert.deepEqual(body.roles, {});
 });

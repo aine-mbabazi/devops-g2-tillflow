@@ -5,9 +5,9 @@ export class InMemoryTenantStore {
   #byId = new Map();
 
   // Owner-driven configuration is a full replace, not a merge: the owner is
-  // always describing the current desired state of their till.
-  configure(tenantId, { attendants, commissionRateBasisPoints }) {
-    const config = { tenantId, attendants, commissionRateBasisPoints };
+  // always describing the current desired state of their tenant.
+  configure(tenantId, { attendants, commissionRateBasisPoints, tills = [], roles = {} }) {
+    const config = { tenantId, attendants, commissionRateBasisPoints, tills, roles };
     this.#byId.set(tenantId, config);
     return config;
   }
@@ -25,5 +25,12 @@ export function toTenantConfigResponse(config) {
     tenant_id: config.tenantId,
     attendants: config.attendants.map((attendant) => ({ attendant_id: attendant.id, phone: attendant.phone })),
     commission_rate_basis_points: config.commissionRateBasisPoints,
+    // Emitted even when empty so a client can rely on the shape being stable
+    // across versions: an older config saved before tills/roles existed reads
+    // back as an empty list and an empty map, not as a missing key.
+    tills: (config.tills ?? []).map((till) => ({
+      till_id: till.id, name: till.name, attendant_ids: till.attendantIds,
+    })),
+    roles: config.roles ?? {},
   };
 }
