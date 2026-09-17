@@ -1,0 +1,92 @@
+name: Deploy POS
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'services/pos/**'
+      - 'services/_shared/**'
+      - '.github/workflows/release-pos.yml'
+
+permissions:
+  contents: read
+  id-token: write
+
+# Never cancel: a cancelled run can leave the service mid-rollout with the
+# deployment circuit breaker still watching it.
+concurrency:
+  group: release-pos
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    name: Build, push, and deploy POS
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_CI_ROLE_ARN }}
+          aws-region: us-east-2
+
+      - name: Login to ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push image
+        id: build
+        env:
+          ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          ECR_REPOSITORY: devops-g2/pos
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          # The ECR repository is IMMUTABLE, so re-running this workflow on a
+          # commit that was already built fails the push. Reuse the existing
+          # image instead: same commit, same digest, so the deploy below is
+          # still exact.
+          DIGEST="$(aws ecr describe-images \
+            --repository-name "$ECR_REPOSITORY" \
+            --image-ids imageTag="$IMAGE_TAG" \
+            --region us-east-2 \
+            --query 'imageDetails[0].imageDigest' \
+            --output text 2>/dev/null || true)"
+
+          if [ -n "$DIGEST" ] && [ "$DIGEST" != "None" ]; then
+            echo "Image for $IMAGE_TAG already in ECR, reusing $DIGEST"
+          else
+            # Built from the repo root so services/_shared is in the context.
+            docker build -f services/pos/Dockerfile -t "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" .
+            docker push "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+            # Read the digest back from the pushed image rather than querying
+            # the registry again, so the deploy uses the bytes just pushed.
+            DIGEST="$(docker inspect --format='{{index .RepoDigests 0}}' \
+              "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" | cut -d@ -f2)"
+          fi
+
+          echo "image=$ECR_REGISTRY/$ECR_REPOSITORY@$DIGEST" >> "$GITHUB_OUTPUT"
+
+      - name: Download current task definition
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition devops-g2-pos \
+            --region us-east-2 \
+            --query 'taskDefinition' > task-def.json
+
+      - name: Render new task definition with updated image
+        id: render
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: task-def.json
+          container-name: pos
+          image: ${{ steps.build.outputs.image }}
+
+      - name: Deploy to ECS
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.render.outputs.task-definition }}
+          service: devops-g2-pos
+          cluster: devops-g2
+          wait-for-service-stability: true
