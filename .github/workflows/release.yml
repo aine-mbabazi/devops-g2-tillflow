@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'services/payments/**'
+      - 'services/_shared/**'
       - '.github/workflows/release.yml'
 
 permissions:
@@ -35,7 +36,7 @@ jobs:
           ECR_REPOSITORY: devops-g2/payments
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG services/payments
+          docker build -f services/payments/Dockerfile -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
           DIGEST=$(aws ecr describe-images --repository-name $ECR_REPOSITORY --image-ids imageTag=$IMAGE_TAG --region us-east-2 --query 'imageDetails[0].imageDigest' --output text)
           echo "image=$ECR_REGISTRY/$ECR_REPOSITORY@$DIGEST" >> "$GITHUB_OUTPUT"

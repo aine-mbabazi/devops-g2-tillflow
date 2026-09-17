@@ -26,6 +26,12 @@ export class PostgresPaymentStore {
     this.pool = pool;
   }
 
+  // Takes a connection from the pool rather than trusting pool state: an
+  // exhausted or unreachable pool must fail readiness, not pass it.
+  async ping() {
+    await this.pool.query('SELECT 1');
+  }
+
   async createOrGet(input) {
     const paymentId = `payment_${randomUUID()}`;
     try {
@@ -69,6 +75,22 @@ export class PostgresPaymentStore {
       [paymentId, providerRequestId],
     );
     if (!result.rows[0]) throw new Error('Payment does not exist');
+  }
+
+  async findByProviderRequestId(providerRequestId) {
+    const result = await this.pool.query(
+      `SELECT ${fields} FROM payments.payment_attempts WHERE provider_request_id = $1`, [providerRequestId],
+    );
+    return result.rows[0] ? paymentFromRow(result.rows[0]) : null;
+  }
+
+  async transition(paymentId, status) {
+    const result = await this.pool.query(
+      `UPDATE payments.payment_attempts SET status = CASE WHEN status = 'pending' THEN $2 ELSE status END, updated_at = now()
+       WHERE payment_id = $1 RETURNING ${fields}`,
+      [paymentId, status],
+    );
+    return result.rows[0] ? paymentFromRow(result.rows[0]) : null;
   }
 
   async #findByIdempotencyKey(tenantId, idempotencyKey) {

@@ -1,0 +1,105 @@
+name: Infra Apply
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'infra/main/**'
+      - '.github/workflows/infra-apply.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Terraform state takes a single lock. Queue runs instead of racing, and never
+# cancel one mid-apply — a half-applied run leaves the lock held.
+concurrency:
+  group: infra-apply
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    name: Plan
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    defaults:
+      run:
+        working-directory: infra/main
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: '1.5.7'
+          terraform_wrapper: false
+
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_CI_ROLE_ARN }}
+          aws-region: us-east-2
+
+      - name: Terraform init
+        run: terraform init
+
+      - name: Terraform plan
+        env:
+          TF_VAR_service_auth_secret_value: ${{ secrets.TF_VAR_SERVICE_AUTH_SECRET_VALUE }}
+        run: terraform plan -out=tfplan -input=false
+     
+      - name: Show plan
+        run: terraform show -no-color tfplan >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload plan
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan-${{ github.sha }}
+          path: infra/main/tfplan
+          retention-days: 5
+          if-no-files-found: error
+
+  apply:
+    name: Apply
+    needs: plan
+    runs-on: ubuntu-latest
+    # Requires a reviewer on the protected `production` environment before the
+    # job starts. That approval is the release gate.
+    environment: production
+    permissions:
+      id-token: write
+      contents: read
+    defaults:
+      run:
+        working-directory: infra/main
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: '1.5.7'
+          terraform_wrapper: false
+
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_CI_APPLY_ROLE_ARN }}
+          aws-region: us-east-2
+
+      - name: Terraform init
+        run: terraform init
+
+      - name: Download plan
+        uses: actions/download-artifact@v4
+        with:
+          name: tfplan-${{ github.sha }}
+          path: infra/main
+
+      # Applying the saved plan file, not a freshly computed one: what a
+      # reviewer approved is exactly what reaches AWS. Terraform refuses the
+      # apply if state moved since the plan.
+      - name: Terraform apply
+        env:
+          TF_VAR_service_auth_secret_value: ${{ secrets.TF_VAR_SERVICE_AUTH_SECRET_VALUE }}
+        run: terraform apply -input=false tfplan

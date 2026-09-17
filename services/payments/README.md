@@ -10,7 +10,7 @@ From the repository root:
 
 ```bash
 cd services/payments
-npm start
+SERVICE_AUTH_SECRET=local-dev-secret npm start
 ```
 
 In another terminal:
@@ -21,7 +21,9 @@ curl http://127.0.0.1:3001/health
 
 Expected response: `{"service":"payments","status":"ok"}`.
 Use `npm run dev` for automatic restarts and `npm test` for the test suite.
-No dependency installation, AWS resources, database, or credentials are needed.
+No AWS resources or database are needed locally — only a `SERVICE_AUTH_SECRET`
+value of your choosing, since it authenticates POS/Commission as callers and
+has no safe default.
 
 ## Configuration
 
@@ -29,6 +31,7 @@ No dependency installation, AWS resources, database, or credentials are needed.
 |----------------------|---------|---------|
 | `HOST` | `127.0.0.1` | Listen address; use `0.0.0.0` when containerizing |
 | `PORT` | `3001` | Integer from 1 to 65535 |
+| `SERVICE_AUTH_SECRET` | — | Required always; shared HMAC secret authenticating POS and Commission as callers (see `services/_shared/service-auth.js`). Obtain from Secrets Manager in deployed environments. |
 | `DARAJA_MODE` | `fake` | Only supported adapter mode in this scaffold |
 | `PAYMENT_STORE` | `memory` | `memory` for local use; `postgres` when RDS is available |
 | `DATABASE_URL` | — | Required when `PAYMENT_STORE=postgres`; obtain at runtime from Secrets Manager |
