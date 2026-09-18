@@ -23,16 +23,44 @@ _Draft targets for G0. Finalized with real measurement at G3._
   since the user-facing journey still failed.
 - **Budget:** `budget = eligible events x (1 - target)`.
 
-## Budget policy (draft — finalized at G3)
+## Budget policy (implemented)
 
-- **Fast burn** (budget consumed rapidly, e.g. >2% of 28-day budget in 1 hour):
-  page on-call immediately, freeze releases until root-caused.
-- **Slow burn** (budget trending toward exhaustion over days): flag in daily
-  standup, no freeze yet, prioritize the underlying fix.
-- Feature work resumes once the burn rate returns to baseline and budget
-  remaining is above the freeze threshold.
+Burn rate is the observed error ratio divided by the budget's allowed error
+ratio. At 1x the budget lasts exactly the 28-day window; at 14.4x it is gone in
+under two days.
+
+| Class | Burn rate | Window | Share of budget consumed in that window | Response |
+|---|---|---|---|---|
+| **Fast burn** | > 14.4x | 1 hour | 2.14% | Page. Freeze releases until root-caused. |
+| **Slow burn** | > 6x | 6 hours | 5.36% | Do **not** page. Ticket + next standup. No freeze. |
+
+Feature work resumes once the burn rate returns below 1x and budget remaining is
+above the freeze threshold.
+
+These are not aspirations — they are the thresholds in
+`infra/main/alarms.tf` (`devops-g2-pos-budget-fast-burn` and
+`devops-g2-pos-budget-slow-burn`), the annotation lines on the burn-rate panel
+of the CloudWatch and Grafana dashboards, and the response steps in
+[`runbook.md`](runbook.md#budget-fast-burn). If any of those four disagree with
+this table, this table wins and the other is the bug.
+
+**Known simplification.** Google's multi-window burn-rate scheme pairs each long
+window with a short one, so an alarm stops firing promptly once the burn stops.
+This implementation uses a single window per class and relies on the alarm's OK
+transition for recovery. That is weaker — a burn that ends mid-window keeps the
+alarm latched until the window rolls — and it is a deliberate trade against
+adding six more alarms on a two-week project.
 
 ## Change control
 
 Targets may change only before final benchmarking (G3), and only with a written
-rationale recorded in this file's revision history.
+rationale recorded here.
+
+### Revision history
+
+- **2026-09-18** — Burn thresholds restated from approximations ("about 2% of
+  budget in 1 hour") to exact burn-rate multipliers (14.4x / 6x), so the
+  document, the alarms and the dashboards can be checked against each other.
+  No change to the intent or to any SLO target. The earlier draft also had a
+  conflicting summary in circulation that described slow burn as freezing
+  releases; it does not, and never did in this document.

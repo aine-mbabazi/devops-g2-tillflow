@@ -144,7 +144,22 @@ export function createApp({ darajaClient, serviceAuthSecret, paymentStore = new 
       if (payment.status !== 'pending' && payment.status !== verified.status) {
         log({ event: 'callback_conflict', paymentId: payment.id, storedStatus: payment.status, verifiedStatus: verified.status });
       }
+      // Captured before the transition, because transition() is a no-op on an
+      // already-terminal payment and would otherwise report a replayed callback
+      // as a fresh one with an ever-growing lag.
+      const wasPending = payment.status === 'pending';
       const updated = await paymentStore.transition(payment.id, verified.status);
+      // The Payments SLI is "callbacks processed within 60s". The window starts
+      // when the attempt was durably recorded and ends here — that is the time
+      // the customer spends watching a sale sit unpaid at the till. Extracted
+      // into TillFlow/payments CallbackLagMs by the devops-g2-callback-lag log
+      // metric filter (infra/main/alarms.tf).
+      if (wasPending && updated?.createdAt) {
+        log({
+          event: 'callback_processed', paymentId: updated.id, status: updated.status,
+          callbackLagMs: Date.now() - new Date(updated.createdAt).getTime(),
+        });
+      }
       statusCode = 200; sendJson(res, statusCode, toPaymentResponse(updated)); return;
     }
     const match = /^\/payments\/([^/]+)$/.exec(path);
@@ -193,7 +208,17 @@ export function createApp({ darajaClient, serviceAuthSecret, paymentStore = new 
       if (payout.status !== 'pending' && payout.status !== verified.status) {
         log({ event: 'callback_conflict', payoutId: payout.id, storedStatus: payout.status, verifiedStatus: verified.status });
       }
+      const wasPending = payout.status === 'pending';
       const updated = await payoutStore.transition(payout.id, verified.status);
+      // Same measurement for B2C. Commission's SLO is a deadline (terminal by
+      // 06:30 EAT), and a payout whose callback is slow is the thing that
+      // misses it, so both flows feed the same metric.
+      if (wasPending && updated?.createdAt) {
+        log({
+          event: 'callback_processed', payoutId: updated.id, status: updated.status,
+          callbackLagMs: Date.now() - new Date(updated.createdAt).getTime(),
+        });
+      }
       statusCode = 200; sendJson(res, statusCode, toPayoutResponse(updated)); return;
     }
     const payoutMatch = /^\/payouts\/([^/]+)$/.exec(path);

@@ -23,3 +23,20 @@
 /evidence/platform-delivery/     @aine-mbabazi
 /evidence/payments-integrity/    @cheshari-pearl
 /evidence/reliability-operations/ @mercykilonzo
+
+# reliability + operations — the DRI owns the alerting path, the probe, the
+# dashboards and the load profiles, even though they live under /infra and
+# would otherwise fall to the platform DRI by the general rule above.
+/infra/main/alarms.tf       @mercykilonzo
+/infra/main/alerting.tf     @mercykilonzo
+/infra/main/synthetics.tf   @mercykilonzo
+/infra/main/dashboards.tf   @mercykilonzo
+/infra/main/lambda/         @mercykilonzo
+/infra/main/canary/         @mercykilonzo
+/load/                      @mercykilonzo
+/observability/             @mercykilonzo
+/docs/alert-contract.md     @mercykilonzo
+/docs/capacity-model.md     @mercykilonzo
+
+# every member writes and defends their own outline
+/docs/defence-outlines.md   @aine-mbabazi @cheshari-pearl @mercykilonzo

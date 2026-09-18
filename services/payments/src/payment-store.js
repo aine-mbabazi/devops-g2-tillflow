@@ -15,7 +15,10 @@ export class InMemoryPaymentStore {
     const saleKey = `${input.tenantId}\u0000${input.saleId}`;
     const salePayment = this.#bySale.get(saleKey);
     if (salePayment && ['pending', 'succeeded'].includes(salePayment.status)) return { kind: 'sale_conflict' };
-    const payment = { ...input, id: `payment_${randomUUID()}`, status: 'pending', providerRequestId: null };
+    // createdAt is what the callback-lag SLI measures from. The Postgres
+    // store gets it from the column default; here it is stamped explicitly so
+    // both stores expose the same field and app.js needs no branch.
+    const payment = { ...input, id: `payment_${randomUUID()}`, status: 'pending', providerRequestId: null, createdAt: new Date() };
     this.#byId.set(payment.id, payment);
     this.#byKey.set(key, payment);
     this.#bySale.set(saleKey, payment);

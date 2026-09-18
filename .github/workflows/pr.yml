@@ -67,6 +67,95 @@ jobs:
       - name: Run tests
         run: npm test
 
+  runbook-anchors:
+    name: Alarms — runbook anchors resolve
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # An alarm that links to a runbook section nobody wrote costs the on-call
+      # engineer a page load to discover there is no guidance, at the moment
+      # they least have time for it. This is the mechanical half of the rule in
+      # docs/runbook.md: add an alarm, add its section in the same PR.
+      - name: Check every alarm links to a real runbook section
+        run: node scripts/check-alarm-runbook-anchors.mjs
+
+  notifier-tests:
+    name: Slack notifier — test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # No install step: the renderer is a pure function with no dependencies,
+      # which is why the AWS SDK import in the handler is lazy.
+      - name: Run tests
+        run: node --test infra/main/lambda/slack-notifier/test.mjs
+
+  k6-smoke:
+    name: k6 — golden path smoke
+    runs-on: ubuntu-latest
+    needs: [pos-tests, payments-tests]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - uses: grafana/setup-k6-action@v1
+
+      - name: Install service dependencies
+        run: |
+          npm ci --prefix services/payments
+          npm ci --prefix services/pos
+
+      # DARAJA_MODE=fake is the brief's rule, not a convenience: "CI and k6 must
+      # use a deterministic fake adapter — never real money or customer data".
+      # The secret below is a throwaway used only to sign requests between two
+      # processes on this runner; it is not the deployed SERVICE_AUTH_SECRET.
+      - name: Start Payments and POS
+        env:
+          SERVICE_AUTH_SECRET: ci-smoke-secret
+        run: |
+          (cd services/payments && SERVICE_AUTH_SECRET=$SERVICE_AUTH_SECRET DARAJA_MODE=fake \
+            PAYMENT_STORE=memory HOST=127.0.0.1 PORT=3001 node src/server.js &)
+          (cd services/pos && SERVICE_AUTH_SECRET=$SERVICE_AUTH_SECRET \
+            PAYMENTS_BASE_URL=http://127.0.0.1:3001 POS_STORE=memory \
+            HOST=127.0.0.1 PORT=3002 node src/server.js &)
+          for i in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:3002/health > /dev/null \
+               && curl -sf http://127.0.0.1:3001/health > /dev/null; then
+              echo "both services up"; exit 0
+            fi
+            sleep 1
+          done
+          echo "services did not become healthy in 30s"; exit 1
+
+      # Runs the same profile, with the same thresholds, that produced the
+      # committed evidence — including tillflow_duplicate_dispatch == 0, which
+      # is what actually gates this job. A PR that reintroduces a double
+      # dispatch under concurrency fails here rather than in production.
+      - name: Run k6 smoke
+        env:
+          SERVICE_AUTH_SECRET: ci-smoke-secret
+        run: k6 run load/k6/smoke.js
+
+      - name: Upload k6 summary
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: k6-smoke-summary
+          path: evidence/reliability-operations/k6/smoke.json
+          if-no-files-found: warn
+
   payments-docker-build:
     name: Payments — Docker build validation
     runs-on: ubuntu-latest
