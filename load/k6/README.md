@@ -11,6 +11,13 @@ smoke test was already failing.
 | `spike.js` | ~4m40s | Does the system *recover* after a 15x surge? |
 | `soak.js` | 16m | Does anything drift — memory, pool exhaustion, creeping latency? |
 | `capacity.js` | 7m30s | Where is the knee? (ramps to 1500 RPS until the envelope breaks) |
+| `step.js` | 90s each | Does the envelope hold at *this* rate? (`-e STEP_RATE=400`) |
+
+`capacity.js` proves a ceiling exists and roughly where, but its summary is an
+aggregate across every step — a run ending at 11% errors cannot say whether
+250 RPS was fine and 1000 was not. `step.js` holds one rate at a time so each
+candidate gets its own pass/fail verdict and its own exported JSON. Run
+`capacity.js` first to bracket the knee, then `step.js` to pin it.
 
 ## Thresholds
 
@@ -47,6 +54,9 @@ cd services/pos && SERVICE_AUTH_SECRET=local-load-secret \
 
 # terminal 3 — from the repo root, so the JSON lands in evidence/
 SERVICE_AUTH_SECRET=local-load-secret k6 run load/k6/smoke.js
+
+# one sustained rate, for the capacity model
+SERVICE_AUTH_SECRET=local-load-secret k6 run -e STEP_RATE=400 load/k6/step.js
 ```
 
 Against a deployed environment, point it at the API Gateway instead:

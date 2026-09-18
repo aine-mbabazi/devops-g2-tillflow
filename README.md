@@ -107,8 +107,41 @@ holds no ongoing cost beyond negligible S3/DynamoDB storage.
 - **Payments health check:** `http://<alb-dns>/health`
 - **ECR repository:** `<account-id>.dkr.ecr.us-east-2.amazonaws.com/devops-g2/payments`
   (resolve `<account-id>` with `aws sts get-caller-identity --query Account --output text`)
-- **CloudWatch Logs:** `/devops-g2/payments`
-- Grafana dashboard: not yet set up (planned for G3)
+- **CloudWatch Logs:** `/devops-g2/payments`, `/devops-g2/pos`, `/devops-g2/commission`
+- **SLO dashboard:** the `slo_dashboard_url` Terraform output (CloudWatch).
+  The Grafana equivalent is committed at
+  [`observability/grafana/tillflow-slo-dashboard.json`](observability/grafana/tillflow-slo-dashboard.json)
+  and imports against a CloudWatch datasource.
+
+## Reliability and operations
+
+- **Alerting:** CloudWatch alarm → SNS → a small Lambda renderer → Slack. Every
+  alarm carries its alert contract (owner, symptom, user impact, first safe
+  action, runbook anchor) in its own `alarm_description`, so an alarm cannot be
+  added without one. See [`docs/alert-contract.md`](docs/alert-contract.md).
+- **The Slack webhook is not in this repo, in Terraform state, or in build
+  logs.** The secret is declared with no version; populate it once, out of band:
+
+  ```bash
+  aws secretsmanager put-secret-value --secret-id devops-g2/slack-webhook \
+    --secret-string 'https://hooks.slack.com/services/...'
+  ```
+
+- **External synthetic probe:** a one-minute CloudWatch Synthetics canary that
+  hits the public entry point from outside the VPC. It is gated on
+  `synthetic_probe_url` so `terraform plan` does not depend on the API Gateway
+  branch having merged. Turn it on with:
+
+  ```bash
+  cd infra/main
+  terraform apply -var "synthetic_probe_url=$(terraform output -raw api_gateway_invoke_url)"
+  ```
+
+- **Load profiles:** [`load/k6/`](load/k6/README.md) — smoke, stepped baseline,
+  spike, soak and a capacity ramp. Every profile asserts
+  `tillflow_duplicate_dispatch == 0`, so a change that lets a retry dispatch a
+  second STK push fails the run regardless of how fast it is. The smoke profile
+  also runs on every PR.
 
 ## Demo script
 
@@ -139,5 +172,8 @@ live or torn down, since the NAT Gateway and ALB bill continuously while running
 - [`docs/adr/`](docs/adr/) — architecture decision records
 - [`docs/threat-model.md`](docs/threat-model.md) — threat model
 - [`docs/slo-error-budgets.md`](docs/slo-error-budgets.md) — SLOs and error budgets
-- `docs/runbook.md` — operational runbook (added at G3)
-- `docs/scar-log.md` — incident/scar log (added as needed)
+- [`docs/runbook.md`](docs/runbook.md) — operational runbook: recovery objectives, rollback vs roll-forward, reconciliation order, restore, per-alarm response, game-day drills
+- [`docs/alert-contract.md`](docs/alert-contract.md) — the nine fields every Slack alert carries, and where they are stored
+- [`docs/capacity-model.md`](docs/capacity-model.md) — k6 results, bottleneck, headroom and cost assumption
+- [`docs/defence-outlines.md`](docs/defence-outlines.md) — 6-minute individual defence outlines, one per DRI
+- [`docs/scar-log.md`](docs/scar-log.md) — incident/scar log

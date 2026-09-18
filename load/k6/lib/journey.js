@@ -128,12 +128,25 @@ export function summaryHandler(name) {
   };
 }
 
+// k6's own text summary is replaced rather than extended: rendering it needs
+// the jslib module, which would make every run depend on fetching a script from
+// the internet — unacceptable for something whose output is evidence. This
+// prints the figures the capacity model cites, plus the threshold verdicts,
+// which is the part of the default summary that actually matters.
 function textSummaryFallback(data) {
   const m = data.metrics || {};
   const line = (label, metric, field) => {
     const value = m[metric] && m[metric].values ? m[metric].values[field] : undefined;
     return `  ${label.padEnd(34)} ${value === undefined ? 'n/a' : Number(value).toFixed(2)}\n`;
   };
+
+  const verdicts = [];
+  for (const [name, metric] of Object.entries(m)) {
+    for (const [expression, result] of Object.entries(metric.thresholds || {})) {
+      verdicts.push(`  ${result.ok ? '✓' : '✗'} ${name} ${expression}\n`);
+    }
+  }
+
   return [
     '\n',
     line('http_reqs (total)', 'http_reqs', 'count'),
@@ -146,6 +159,8 @@ function textSummaryFallback(data) {
     line('tenant_config p95 (ms)', 'tillflow_tenant_config_duration', 'p(95)'),
     line('checks (rate)', 'checks', 'rate'),
     line('duplicate dispatches', 'tillflow_duplicate_dispatch', 'count'),
+    '\n  thresholds\n',
+    ...(verdicts.length ? verdicts : ['  (none declared)\n']),
     '\n',
   ].join('');
 }
