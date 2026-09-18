@@ -449,6 +449,41 @@ test('replaying a callback after a terminal result is a no-op', async (t) => {
   assert.ok(!entries.some((entry) => entry.event === 'callback_conflict'));
 });
 
+test('a terminal callback logs the lag the Payments SLI is measured from, once per payment', async (t) => {
+  const { base, client, getLastProviderRequestId, entries } = await startPayments(t);
+  await requestPayment(base, validPayment);
+  const providerRequestId = getLastProviderRequestId();
+  client.simulateOutcome(providerRequestId, 'succeeded');
+
+  assert.equal((await postCallback(base, providerRequestId)).status, 200);
+  const processed = entries.filter((entry) => entry.event === 'callback_processed');
+  assert.equal(processed.length, 1);
+  assert.equal(processed[0].status, 'succeeded');
+  assert.ok(Number.isFinite(processed[0].callbackLagMs), 'callbackLagMs must be a number the metric filter can extract');
+  assert.ok(processed[0].callbackLagMs >= 0);
+
+  // A replayed callback must NOT emit a second event. The metric filter behind
+  // devops-g2-payments-callback-lag would read the replay's age as a genuine
+  // breach, so a callback replayed an hour later would page the on-call for a
+  // payment that was actually processed instantly.
+  entries.length = 0;
+  assert.equal((await postCallback(base, providerRequestId)).status, 200);
+  assert.ok(!entries.some((entry) => entry.event === 'callback_processed'));
+});
+
+test('payout callbacks feed the same lag metric as payments', async (t) => {
+  const { base, client, getLastB2CProviderRequestId, entries } = await startPayments(t);
+  await requestPayout(base, validPayout);
+  const providerRequestId = getLastB2CProviderRequestId();
+  client.simulateOutcome(providerRequestId, 'succeeded');
+
+  assert.equal((await postPayoutCallback(base, providerRequestId)).status, 200);
+  const processed = entries.filter((entry) => entry.event === 'callback_processed');
+  assert.equal(processed.length, 1);
+  assert.ok(processed[0].payoutId.startsWith('payout_'));
+  assert.ok(Number.isFinite(processed[0].callbackLagMs));
+});
+
 test('a callback reporting an outcome that conflicts with the stored terminal state is preserved and flagged', async (t) => {
   const { base, client, getLastProviderRequestId, entries } = await startPayments(t);
   await requestPayment(base, validPayment);

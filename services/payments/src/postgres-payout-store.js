@@ -13,11 +13,15 @@ function payoutFromRow(row) {
     recipientPhone: row.recipient_phone,
     status: row.status,
     providerRequestId: row.provider_request_id,
+    createdAt: row.created_at,
   };
 }
 
+// Same split as the payment store: `fields` is the INSERT column list,
+// `selectFields` adds the database-defaulted created_at for reads.
 const fields = `payout_id, tenant_id, attendant_id, commission_run_id, idempotency_key, request_fingerprint,
   amount_minor, currency, recipient_phone, status, provider_request_id`;
+const selectFields = `${fields}, created_at`;
 
 // The pool is injected to keep database access testable and avoid opening a
 // connection at module load time. `pg.Pool` satisfies this interface.
@@ -34,7 +38,7 @@ export class PostgresPayoutStore {
         `INSERT INTO payments.payout_attempts (${fields})
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'pending', NULL)
          ON CONFLICT (tenant_id, idempotency_key) DO NOTHING
-         RETURNING ${fields}`,
+         RETURNING ${selectFields}`,
         [payoutId, input.tenantId, input.attendantId, input.commissionRunId, input.idempotencyKey, input.fingerprint,
           input.amountMinor, input.currency, input.recipientPhone],
       );
@@ -56,7 +60,7 @@ export class PostgresPayoutStore {
 
   async findById(payoutId) {
     const result = await this.pool.query(
-      `SELECT ${fields} FROM payments.payout_attempts WHERE payout_id = $1`, [payoutId],
+      `SELECT ${selectFields} FROM payments.payout_attempts WHERE payout_id = $1`, [payoutId],
     );
     return result.rows[0] ? payoutFromRow(result.rows[0]) : null;
   }
@@ -74,7 +78,7 @@ export class PostgresPayoutStore {
 
   async findByProviderRequestId(providerRequestId) {
     const result = await this.pool.query(
-      `SELECT ${fields} FROM payments.payout_attempts WHERE provider_request_id = $1`, [providerRequestId],
+      `SELECT ${selectFields} FROM payments.payout_attempts WHERE provider_request_id = $1`, [providerRequestId],
     );
     return result.rows[0] ? payoutFromRow(result.rows[0]) : null;
   }
@@ -82,7 +86,7 @@ export class PostgresPayoutStore {
   async transition(payoutId, status) {
     const result = await this.pool.query(
       `UPDATE payments.payout_attempts SET status = CASE WHEN status = 'pending' THEN $2 ELSE status END, updated_at = now()
-       WHERE payout_id = $1 RETURNING ${fields}`,
+       WHERE payout_id = $1 RETURNING ${selectFields}`,
       [payoutId, status],
     );
     return result.rows[0] ? payoutFromRow(result.rows[0]) : null;
@@ -90,7 +94,7 @@ export class PostgresPayoutStore {
 
   async #findByIdempotencyKey(tenantId, idempotencyKey) {
     const result = await this.pool.query(
-      `SELECT ${fields} FROM payments.payout_attempts
+      `SELECT ${selectFields} FROM payments.payout_attempts
        WHERE tenant_id = $1 AND idempotency_key = $2`, [tenantId, idempotencyKey],
     );
     return result.rows[0] ? payoutFromRow(result.rows[0]) : null;

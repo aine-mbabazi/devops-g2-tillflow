@@ -12,11 +12,16 @@ function paymentFromRow(row) {
     customerPhone: row.customer_phone,
     status: row.status,
     providerRequestId: row.provider_request_id,
+    createdAt: row.created_at,
   };
 }
 
+// `fields` doubles as the INSERT column list, so created_at cannot join it —
+// the column has a database default and is never written by the application.
+// `selectFields` is what every read and RETURNING clause uses instead.
 const fields = `payment_id, tenant_id, sale_id, idempotency_key, request_fingerprint,
   amount_minor, currency, customer_phone, status, provider_request_id`;
+const selectFields = `${fields}, created_at`;
 
 // The pool is injected to keep database access testable and avoid opening a
 // connection at module load time. `pg.Pool` satisfies this interface.
@@ -39,7 +44,7 @@ export class PostgresPaymentStore {
         `INSERT INTO payments.payment_attempts (${fields})
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending', NULL)
          ON CONFLICT (tenant_id, idempotency_key) DO NOTHING
-         RETURNING ${fields}`,
+         RETURNING ${selectFields}`,
         [paymentId, input.tenantId, input.saleId, input.idempotencyKey, input.fingerprint,
           input.amountMinor, input.currency, input.customerPhone],
       );
@@ -61,7 +66,7 @@ export class PostgresPaymentStore {
 
   async findById(paymentId) {
     const result = await this.pool.query(
-      `SELECT ${fields} FROM payments.payment_attempts WHERE payment_id = $1`, [paymentId],
+      `SELECT ${selectFields} FROM payments.payment_attempts WHERE payment_id = $1`, [paymentId],
     );
     return result.rows[0] ? paymentFromRow(result.rows[0]) : null;
   }
@@ -79,7 +84,7 @@ export class PostgresPaymentStore {
 
   async findByProviderRequestId(providerRequestId) {
     const result = await this.pool.query(
-      `SELECT ${fields} FROM payments.payment_attempts WHERE provider_request_id = $1`, [providerRequestId],
+      `SELECT ${selectFields} FROM payments.payment_attempts WHERE provider_request_id = $1`, [providerRequestId],
     );
     return result.rows[0] ? paymentFromRow(result.rows[0]) : null;
   }
@@ -87,7 +92,7 @@ export class PostgresPaymentStore {
   async transition(paymentId, status) {
     const result = await this.pool.query(
       `UPDATE payments.payment_attempts SET status = CASE WHEN status = 'pending' THEN $2 ELSE status END, updated_at = now()
-       WHERE payment_id = $1 RETURNING ${fields}`,
+       WHERE payment_id = $1 RETURNING ${selectFields}`,
       [paymentId, status],
     );
     return result.rows[0] ? paymentFromRow(result.rows[0]) : null;
@@ -95,7 +100,7 @@ export class PostgresPaymentStore {
 
   async #findByIdempotencyKey(tenantId, idempotencyKey) {
     const result = await this.pool.query(
-      `SELECT ${fields} FROM payments.payment_attempts
+      `SELECT ${selectFields} FROM payments.payment_attempts
        WHERE tenant_id = $1 AND idempotency_key = $2`, [tenantId, idempotencyKey],
     );
     return result.rows[0] ? paymentFromRow(result.rows[0]) : null;
