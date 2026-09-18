@@ -6,9 +6,56 @@
 // action — so a small renderer sits in between. It is the only thing in this
 // account that holds the webhook.
 
-resource "aws_sns_topic" "alerts" {
-  name = "${local.name_prefix}-alerts"
+# A customer-managed key, not the AWS-managed alias/aws/sns.
+#
+# This is not a preference. CloudWatch Alarms publish to this topic as the
+# service principal cloudwatch.amazonaws.com, and publishing to an encrypted
+# topic requires kms:GenerateDataKey* on the key. The AWS-managed key's policy
+# cannot be edited, so with alias/aws/sns every alarm would fail to publish —
+# silently, because a failed SNS publish from an alarm surfaces nowhere. The
+# alerting would look provisioned and deliver nothing.
+resource "aws_kms_key" "alerts" {
+  description             = "Encrypts the TillFlow alerts topic. Alarm bodies carry service and impact detail."
+  enable_key_rotation     = true
+  deletion_window_in_days = 7
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        # Without root access the key becomes unmanageable if every other
+        # grant is removed. AWS rejects a key policy that locks itself out.
+        Sid       = "AllowAccountAdministration"
+        Effect    = "Allow"
+        Principal = { AWS = "arn:aws:iam::${local.account_id}:root" }
+        Action    = "kms:*"
+        Resource  = "*"
+      },
+      {
+        Sid       = "AllowCloudWatchAlarmsToPublish"
+        Effect    = "Allow"
+        Principal = { Service = "cloudwatch.amazonaws.com" }
+        Action    = ["kms:GenerateDataKey*", "kms:Decrypt"]
+        Resource  = "*"
+        Condition = {
+          StringEquals = { "aws:SourceAccount" = local.account_id }
+        }
+      },
+    ]
+  })
+
   tags = merge(local.common_tags, { service = "reliability" })
+}
+
+resource "aws_kms_alias" "alerts" {
+  name          = "alias/${local.name_prefix}-alerts"
+  target_key_id = aws_kms_key.alerts.key_id
+}
+
+resource "aws_sns_topic" "alerts" {
+  name              = "${local.name_prefix}-alerts"
+  kms_master_key_id = aws_kms_key.alerts.id
+  tags              = merge(local.common_tags, { service = "reliability" })
 }
 
 # CloudWatch publishes alarm state changes to the topic. Scoped to this

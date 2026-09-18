@@ -179,8 +179,9 @@ rate card, not a measured bill.**
 | ECS Fargate | 2 tasks at 0.25 vCPU / 0.5 GB | ~$18 |
 | CloudWatch alarms | 13 at $0.10 | ~$1 |
 | Custom metrics | 8 log-derived metrics at $0.30 | ~$2 |
+| KMS | 1 customer-managed key for the alerts topic | ~$1 |
 | Lambda, S3, DynamoDB, Secrets Manager | at this volume | <$2 |
-| | | **~$138** |
+| | | **~$139** |
 
 ### The finding worth raising
 

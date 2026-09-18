@@ -249,7 +249,7 @@ the "after" worse than the "before" and prove nothing.
 
 ### Cost finding
 
-The capacity model prices the stack at roughly **$138/month** at list price. The
+The capacity model prices the stack at roughly **$139/month** at list price. The
 one-minute synthetic probe is ~$52 of that — the second-largest line item, more
 than the database and more than both application services combined. The brief
 specifies one minute so it stays, but the model documents the five-minute option
