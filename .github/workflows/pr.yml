@@ -67,6 +67,23 @@ jobs:
       - name: Run tests
         run: npm test
 
+  runbook-anchors:
+    name: Alarms — runbook anchors resolve
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # An alarm that links to a runbook section nobody wrote costs the on-call
+      # engineer a page load to discover there is no guidance, at the moment
+      # they least have time for it. This is the mechanical half of the rule in
+      # docs/runbook.md: add an alarm, add its section in the same PR.
+      - name: Check every alarm links to a real runbook section
+        run: node scripts/check-alarm-runbook-anchors.mjs
+
   notifier-tests:
     name: Slack notifier — test
     runs-on: ubuntu-latest

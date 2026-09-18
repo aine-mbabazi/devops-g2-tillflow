@@ -10,34 +10,123 @@
     }
   ],
   "__requires": [
-    { "type": "grafana", "id": "grafana", "name": "Grafana", "version": "11.0.0" },
-    { "type": "datasource", "id": "cloudwatch", "name": "CloudWatch", "version": "1.0.0" }
+    {
+      "type": "grafana",
+      "id": "grafana",
+      "name": "Grafana",
+      "version": "11.0.0"
+    },
+    {
+      "type": "datasource",
+      "id": "cloudwatch",
+      "name": "CloudWatch",
+      "version": "1.0.0"
+    }
   ],
   "title": "TillFlow — SLO & service health",
   "uid": "tillflow-slo",
   "description": "Reliability + operations dashboard. Panel order follows the question order of an incident: is it up, how much budget is left, how fast is it burning, then RED, saturation, and finally whether the product is actually working. Owned by @mercykilonzo; see docs/runbook.md.",
-  "tags": ["tillflow", "slo", "devops-g2"],
+  "tags": [
+    "tillflow",
+    "slo",
+    "devops-g2"
+  ],
   "timezone": "Africa/Nairobi",
   "editable": true,
   "schemaVersion": 39,
   "version": 1,
   "refresh": "1m",
-  "time": { "from": "now-6h", "to": "now" },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
   "templating": {
     "list": [
       {
         "name": "datasource",
         "type": "datasource",
         "query": "cloudwatch",
-        "current": { "text": "CloudWatch", "value": "${DS_CLOUDWATCH}" },
+        "current": {
+          "text": "CloudWatch",
+          "value": "${DS_CLOUDWATCH}"
+        },
         "hide": 0
       },
       {
         "name": "region",
         "type": "constant",
         "query": "us-east-2",
-        "current": { "text": "us-east-2", "value": "us-east-2" },
+        "current": {
+          "text": "us-east-2",
+          "value": "us-east-2"
+        },
         "hide": 2
+      },
+      {
+        "name": "pos_tg",
+        "label": "POS target group",
+        "type": "query",
+        "datasource": {
+          "type": "cloudwatch",
+          "uid": "${DS_CLOUDWATCH}"
+        },
+        "query": {
+          "queryType": "dimensionValues",
+          "region": "$region",
+          "namespace": "AWS/ApplicationELB",
+          "metricName": "RequestCount",
+          "dimensionKey": "TargetGroup",
+          "dimensionFilters": {}
+        },
+        "regex": "/.*pos-tg.*/",
+        "refresh": 1,
+        "includeAll": false,
+        "multi": false,
+        "hide": 0
+      },
+      {
+        "name": "payments_tg",
+        "label": "Payments target group",
+        "type": "query",
+        "datasource": {
+          "type": "cloudwatch",
+          "uid": "${DS_CLOUDWATCH}"
+        },
+        "query": {
+          "queryType": "dimensionValues",
+          "region": "$region",
+          "namespace": "AWS/ApplicationELB",
+          "metricName": "RequestCount",
+          "dimensionKey": "TargetGroup",
+          "dimensionFilters": {}
+        },
+        "regex": "/.*payments-tg.*/",
+        "refresh": 1,
+        "includeAll": false,
+        "multi": false,
+        "hide": 0
+      },
+      {
+        "name": "alb",
+        "label": "Load balancer",
+        "type": "query",
+        "datasource": {
+          "type": "cloudwatch",
+          "uid": "${DS_CLOUDWATCH}"
+        },
+        "query": {
+          "queryType": "dimensionValues",
+          "region": "$region",
+          "namespace": "AWS/ApplicationELB",
+          "metricName": "RequestCount",
+          "dimensionKey": "LoadBalancer",
+          "dimensionFilters": {}
+        },
+        "regex": "/.*devops-g2-alb.*/",
+        "refresh": 1,
+        "includeAll": false,
+        "multi": false,
+        "hide": 0
       }
     ]
   },
@@ -59,7 +148,12 @@
     {
       "type": "row",
       "title": "Uptime & budget",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
       "collapsed": false
     },
     {
@@ -67,8 +161,16 @@
       "type": "stat",
       "title": "Uptime — 5 minutes",
       "description": "External synthetic probe success rate over the last 5 minutes. This is the 'is it up right now' number.",
-      "datasource": { "type": "cloudwatch", "uid": "${DS_CLOUDWATCH}" },
-      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 1 },
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "${DS_CLOUDWATCH}"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 0,
+        "y": 1
+      },
       "fieldConfig": {
         "defaults": {
           "unit": "percent",
@@ -78,21 +180,40 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "red", "value": null },
-              { "color": "orange", "value": 99.5 },
-              { "color": "green", "value": 99.9 }
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 99.5
+              },
+              {
+                "color": "green",
+                "value": 99.9
+              }
             ]
           }
         },
         "overrides": []
       },
-      "options": { "graphMode": "none", "colorMode": "background", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "options": {
+        "graphMode": "none",
+        "colorMode": "background",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
       "targets": [
         {
           "refId": "A",
           "namespace": "CloudWatchSynthetics",
           "metricName": "SuccessPercent",
-          "dimensions": { "CanaryName": "devops-g2-probe" },
+          "dimensions": {
+            "CanaryName": "devops-g2-probe"
+          },
           "statistic": "Average",
           "period": "300",
           "region": "$region"
@@ -104,8 +225,16 @@
       "type": "stat",
       "title": "Uptime — 1 hour",
       "description": "Same probe, one-hour window. Smooths a single failed run so a transient blip does not read as an outage.",
-      "datasource": { "type": "cloudwatch", "uid": "${DS_CLOUDWATCH}" },
-      "gridPos": { "h": 5, "w": 6, "x": 6, "y": 1 },
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "${DS_CLOUDWATCH}"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 6,
+        "y": 1
+      },
       "fieldConfig": {
         "defaults": {
           "unit": "percent",
@@ -113,21 +242,40 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "red", "value": null },
-              { "color": "orange", "value": 99.5 },
-              { "color": "green", "value": 99.9 }
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 99.5
+              },
+              {
+                "color": "green",
+                "value": 99.9
+              }
             ]
           }
         },
         "overrides": []
       },
-      "options": { "graphMode": "none", "colorMode": "background", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "options": {
+        "graphMode": "none",
+        "colorMode": "background",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
       "targets": [
         {
           "refId": "A",
           "namespace": "CloudWatchSynthetics",
           "metricName": "SuccessPercent",
-          "dimensions": { "CanaryName": "devops-g2-probe" },
+          "dimensions": {
+            "CanaryName": "devops-g2-probe"
+          },
           "statistic": "Average",
           "period": "3600",
           "region": "$region"
@@ -139,8 +287,16 @@
       "type": "stat",
       "title": "Uptime — 28 days",
       "description": "The SLO window itself. This is the number the reliability contract in docs/slo-error-budgets.md is actually written against — the two above are for triage, this one is for the commitment.",
-      "datasource": { "type": "cloudwatch", "uid": "${DS_CLOUDWATCH}" },
-      "gridPos": { "h": 5, "w": 6, "x": 12, "y": 1 },
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "${DS_CLOUDWATCH}"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 12,
+        "y": 1
+      },
       "fieldConfig": {
         "defaults": {
           "unit": "percent",
@@ -148,9 +304,18 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "red", "value": null },
-              { "color": "orange", "value": 99.5 },
-              { "color": "green", "value": 99.9 }
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 99.5
+              },
+              {
+                "color": "green",
+                "value": 99.9
+              }
             ]
           }
         },
@@ -159,7 +324,11 @@
       "options": {
         "graphMode": "none",
         "colorMode": "background",
-        "reduceOptions": { "calcs": ["mean"] },
+        "reduceOptions": {
+          "calcs": [
+            "mean"
+          ]
+        },
         "text": {}
       },
       "timeFrom": "28d",
@@ -168,7 +337,9 @@
           "refId": "A",
           "namespace": "CloudWatchSynthetics",
           "metricName": "SuccessPercent",
-          "dimensions": { "CanaryName": "devops-g2-probe" },
+          "dimensions": {
+            "CanaryName": "devops-g2-probe"
+          },
           "statistic": "Average",
           "period": "3600",
           "region": "$region"
@@ -180,8 +351,16 @@
       "type": "gauge",
       "title": "POS error budget remaining (28d)",
       "description": "100 × (1 − consumed ÷ allowed), where allowed = 0.1% of eligible requests over 28 days (40m 19s). Below 0 the budget is overspent and the release freeze in docs/slo-error-budgets.md applies.",
-      "datasource": { "type": "cloudwatch", "uid": "${DS_CLOUDWATCH}" },
-      "gridPos": { "h": 5, "w": 6, "x": 18, "y": 1 },
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "${DS_CLOUDWATCH}"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 18,
+        "y": 1
+      },
       "fieldConfig": {
         "defaults": {
           "unit": "percent",
@@ -191,9 +370,18 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "red", "value": null },
-              { "color": "orange", "value": 25 },
-              { "color": "green", "value": 50 }
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 25
+              },
+              {
+                "color": "green",
+                "value": 50
+              }
             ]
           }
         },
@@ -202,30 +390,36 @@
       "timeFrom": "28d",
       "targets": [
         {
-          "refId": "errors",
+          "refId": "A",
           "namespace": "AWS/ApplicationELB",
           "metricName": "HTTPCode_Target_5XX_Count",
-          "dimensions": { "TargetGroup": "devops-g2-pos-tg" },
+          "dimensions": {
+            "TargetGroup": "$pos_tg"
+          },
           "statistic": "Sum",
           "period": "3600",
           "region": "$region",
-          "hide": true
+          "hide": true,
+          "id": "errors"
         },
         {
-          "refId": "requests",
+          "refId": "B",
           "namespace": "AWS/ApplicationELB",
           "metricName": "RequestCount",
-          "dimensions": { "TargetGroup": "devops-g2-pos-tg" },
+          "dimensions": {
+            "TargetGroup": "$pos_tg"
+          },
           "statistic": "Sum",
           "period": "3600",
           "region": "$region",
-          "hide": true
+          "hide": true,
+          "id": "requests"
         },
         {
-          "refId": "budget",
+          "refId": "C",
           "expression": "100 * (1 - (SUM(FILL(errors,0)) / IF(SUM(requests) > 0, SUM(requests), 1)) / 0.001)",
           "id": "budget",
-          "metricQueryType": 1,
+          "metricQueryType": 0,
           "metricEditorMode": 1,
           "region": "$region"
         }
@@ -236,52 +430,84 @@
       "type": "timeseries",
       "title": "POS burn rate (× sustainable)",
       "description": "1.0 means the 28-day budget is consumed in exactly 28 days. The two threshold lines are the same values the devops-g2-pos-budget-fast-burn and -slow-burn alarms use, so this panel and the page can never disagree.",
-      "datasource": { "type": "cloudwatch", "uid": "${DS_CLOUDWATCH}" },
-      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 6 },
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "${DS_CLOUDWATCH}"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 0,
+        "y": 6
+      },
       "fieldConfig": {
         "defaults": {
           "unit": "none",
           "decimals": 2,
-          "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 10 },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10
+          },
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "orange", "value": 6 },
-              { "color": "red", "value": 14.4 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 6
+              },
+              {
+                "color": "red",
+                "value": 14.4
+              }
             ]
           }
         },
         "overrides": []
       },
-      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
       "targets": [
         {
-          "refId": "errors",
+          "refId": "A",
           "namespace": "AWS/ApplicationELB",
           "metricName": "HTTPCode_Target_5XX_Count",
-          "dimensions": { "TargetGroup": "devops-g2-pos-tg" },
+          "dimensions": {
+            "TargetGroup": "$pos_tg"
+          },
           "statistic": "Sum",
           "period": "3600",
           "region": "$region",
-          "hide": true
+          "hide": true,
+          "id": "errors"
         },
         {
-          "refId": "requests",
+          "refId": "B",
           "namespace": "AWS/ApplicationELB",
           "metricName": "RequestCount",
-          "dimensions": { "TargetGroup": "devops-g2-pos-tg" },
+          "dimensions": {
+            "TargetGroup": "$pos_tg"
+          },
           "statistic": "Sum",
           "period": "3600",
           "region": "$region",
-          "hide": true
+          "hide": true,
+          "id": "requests"
         },
         {
-          "refId": "burn",
+          "refId": "C",
           "expression": "(FILL(errors,0) / IF(requests > 0, requests, 1)) / 0.001",
           "id": "burn",
           "label": "burn rate",
-          "metricQueryType": 1,
+          "metricQueryType": 0,
           "metricEditorMode": 1,
           "region": "$region"
         }
@@ -292,17 +518,35 @@
       "type": "timeseries",
       "title": "Payments callback lag p95 vs the 60s SLI",
       "description": "Derived from the callback_processed log event via the devops-g2-callback-lag metric filter. Above the line, sales sit pending at the till after the customer has already paid.",
-      "datasource": { "type": "cloudwatch", "uid": "${DS_CLOUDWATCH}" },
-      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 6 },
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "${DS_CLOUDWATCH}"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 12,
+        "y": 6
+      },
       "fieldConfig": {
         "defaults": {
           "unit": "ms",
-          "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 10 },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10
+          },
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 60000 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 60000
+              }
             ]
           }
         },
@@ -322,22 +566,46 @@
     {
       "type": "row",
       "title": "RED — rate, errors, duration",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 13 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 13
+      },
       "collapsed": false
     },
     {
       "id": 7,
       "type": "timeseries",
       "title": "Rate — requests/min",
-      "datasource": { "type": "cloudwatch", "uid": "${DS_CLOUDWATCH}" },
-      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 14 },
-      "fieldConfig": { "defaults": { "unit": "reqpm", "custom": { "drawStyle": "line", "lineWidth": 2 } }, "overrides": [] },
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "${DS_CLOUDWATCH}"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 0,
+        "y": 14
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqpm",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2
+          }
+        },
+        "overrides": []
+      },
       "targets": [
         {
           "refId": "A",
           "namespace": "AWS/ApplicationELB",
           "metricName": "RequestCount",
-          "dimensions": { "TargetGroup": "devops-g2-pos-tg" },
+          "dimensions": {
+            "TargetGroup": "$pos_tg"
+          },
           "statistic": "Sum",
           "period": "60",
           "label": "POS",
@@ -347,7 +615,9 @@
           "refId": "B",
           "namespace": "AWS/ApplicationELB",
           "metricName": "RequestCount",
-          "dimensions": { "TargetGroup": "devops-g2-payments-tg" },
+          "dimensions": {
+            "TargetGroup": "$payments_tg"
+          },
           "statistic": "Sum",
           "period": "60",
           "label": "Payments",
@@ -360,15 +630,34 @@
       "type": "timeseries",
       "title": "Errors — 5xx/min",
       "description": "Target 5xx is the service failing. ELB 5xx with no target 5xx means the load balancer had no healthy target to send to — a different incident with a different first action.",
-      "datasource": { "type": "cloudwatch", "uid": "${DS_CLOUDWATCH}" },
-      "gridPos": { "h": 7, "w": 8, "x": 8, "y": 14 },
-      "fieldConfig": { "defaults": { "unit": "short", "custom": { "drawStyle": "bars", "fillOpacity": 60 } }, "overrides": [] },
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "${DS_CLOUDWATCH}"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 8,
+        "y": 14
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 60
+          }
+        },
+        "overrides": []
+      },
       "targets": [
         {
           "refId": "A",
           "namespace": "AWS/ApplicationELB",
           "metricName": "HTTPCode_Target_5XX_Count",
-          "dimensions": { "TargetGroup": "devops-g2-pos-tg" },
+          "dimensions": {
+            "TargetGroup": "$pos_tg"
+          },
           "statistic": "Sum",
           "period": "60",
           "label": "POS 5xx",
@@ -378,7 +667,9 @@
           "refId": "B",
           "namespace": "AWS/ApplicationELB",
           "metricName": "HTTPCode_Target_5XX_Count",
-          "dimensions": { "TargetGroup": "devops-g2-payments-tg" },
+          "dimensions": {
+            "TargetGroup": "$payments_tg"
+          },
           "statistic": "Sum",
           "period": "60",
           "label": "Payments 5xx",
@@ -388,7 +679,9 @@
           "refId": "C",
           "namespace": "AWS/ApplicationELB",
           "metricName": "HTTPCode_ELB_5XX_Count",
-          "dimensions": { "LoadBalancer": "devops-g2-alb" },
+          "dimensions": {
+            "LoadBalancer": "$alb"
+          },
           "statistic": "Sum",
           "period": "60",
           "label": "ALB 5xx (no healthy target)",
@@ -400,18 +693,38 @@
       "id": 9,
       "type": "timeseries",
       "title": "Duration — p95 latency",
-      "datasource": { "type": "cloudwatch", "uid": "${DS_CLOUDWATCH}" },
-      "gridPos": { "h": 7, "w": 8, "x": 16, "y": 14 },
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "${DS_CLOUDWATCH}"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 16,
+        "y": 14
+      },
       "fieldConfig": {
         "defaults": {
           "unit": "s",
-          "custom": { "drawStyle": "line", "lineWidth": 2 },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2
+          },
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "orange", "value": 0.4 },
-              { "color": "red", "value": 0.5 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 0.4
+              },
+              {
+                "color": "red",
+                "value": 0.5
+              }
             ]
           }
         },
@@ -422,7 +735,9 @@
           "refId": "A",
           "namespace": "AWS/ApplicationELB",
           "metricName": "TargetResponseTime",
-          "dimensions": { "TargetGroup": "devops-g2-pos-tg" },
+          "dimensions": {
+            "TargetGroup": "$pos_tg"
+          },
           "statistic": "p95",
           "period": "60",
           "label": "POS p95 (SLO 400ms)",
@@ -432,7 +747,9 @@
           "refId": "B",
           "namespace": "AWS/ApplicationELB",
           "metricName": "TargetResponseTime",
-          "dimensions": { "TargetGroup": "devops-g2-payments-tg" },
+          "dimensions": {
+            "TargetGroup": "$payments_tg"
+          },
           "statistic": "p95",
           "period": "60",
           "label": "Payments p95",
@@ -443,7 +760,12 @@
     {
       "type": "row",
       "title": "Saturation",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 21 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 21
+      },
       "collapsed": false
     },
     {
@@ -451,20 +773,40 @@
       "type": "timeseries",
       "title": "ECS task CPU / memory",
       "description": "Threshold lines are the k6 capacity envelope (CPU < 70%, memory < 75%), so the live dashboard is judged against the same ceiling the capacity model was measured against.",
-      "datasource": { "type": "cloudwatch", "uid": "${DS_CLOUDWATCH}" },
-      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 22 },
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "${DS_CLOUDWATCH}"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 0,
+        "y": 22
+      },
       "fieldConfig": {
         "defaults": {
           "unit": "percent",
           "min": 0,
           "max": 100,
-          "custom": { "drawStyle": "line", "lineWidth": 2 },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2
+          },
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "orange", "value": 70 },
-              { "color": "red", "value": 75 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 70
+              },
+              {
+                "color": "red",
+                "value": 75
+              }
             ]
           }
         },
@@ -475,7 +817,10 @@
           "refId": "A",
           "namespace": "AWS/ECS",
           "metricName": "CPUUtilization",
-          "dimensions": { "ClusterName": "devops-g2", "ServiceName": "devops-g2-pos" },
+          "dimensions": {
+            "ClusterName": "devops-g2",
+            "ServiceName": "devops-g2-pos"
+          },
           "statistic": "Average",
           "period": "60",
           "label": "POS CPU",
@@ -485,7 +830,10 @@
           "refId": "B",
           "namespace": "AWS/ECS",
           "metricName": "MemoryUtilization",
-          "dimensions": { "ClusterName": "devops-g2", "ServiceName": "devops-g2-pos" },
+          "dimensions": {
+            "ClusterName": "devops-g2",
+            "ServiceName": "devops-g2-pos"
+          },
           "statistic": "Average",
           "period": "60",
           "label": "POS memory",
@@ -495,7 +843,10 @@
           "refId": "C",
           "namespace": "AWS/ECS",
           "metricName": "CPUUtilization",
-          "dimensions": { "ClusterName": "devops-g2", "ServiceName": "devops-g2-payments" },
+          "dimensions": {
+            "ClusterName": "devops-g2",
+            "ServiceName": "devops-g2-payments"
+          },
           "statistic": "Average",
           "period": "60",
           "label": "Payments CPU",
@@ -505,7 +856,10 @@
           "refId": "D",
           "namespace": "AWS/ECS",
           "metricName": "MemoryUtilization",
-          "dimensions": { "ClusterName": "devops-g2", "ServiceName": "devops-g2-payments" },
+          "dimensions": {
+            "ClusterName": "devops-g2",
+            "ServiceName": "devops-g2-payments"
+          },
           "statistic": "Average",
           "period": "60",
           "label": "Payments memory",
@@ -518,15 +872,33 @@
       "type": "timeseries",
       "title": "RDS — CPU and connections",
       "description": "One db.t4g.micro is shared by POS, Payments and Commission. It is the first place to look when two services degrade at once.",
-      "datasource": { "type": "cloudwatch", "uid": "${DS_CLOUDWATCH}" },
-      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 22 },
-      "fieldConfig": { "defaults": { "custom": { "drawStyle": "line", "lineWidth": 2 } }, "overrides": [] },
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "${DS_CLOUDWATCH}"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 12,
+        "y": 22
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2
+          }
+        },
+        "overrides": []
+      },
       "targets": [
         {
           "refId": "A",
           "namespace": "AWS/RDS",
           "metricName": "CPUUtilization",
-          "dimensions": { "DBInstanceIdentifier": "devops-g2-db" },
+          "dimensions": {
+            "DBInstanceIdentifier": "devops-g2-db"
+          },
           "statistic": "Average",
           "period": "60",
           "label": "CPU %",
@@ -536,7 +908,9 @@
           "refId": "B",
           "namespace": "AWS/RDS",
           "metricName": "DatabaseConnections",
-          "dimensions": { "DBInstanceIdentifier": "devops-g2-db" },
+          "dimensions": {
+            "DBInstanceIdentifier": "devops-g2-db"
+          },
           "statistic": "Maximum",
           "period": "60",
           "label": "connections",
@@ -547,7 +921,12 @@
     {
       "type": "row",
       "title": "Business signals & money-correctness",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 29 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 29
+      },
       "collapsed": false
     },
     {
@@ -555,9 +934,26 @@
       "type": "timeseries",
       "title": "Sales recorded vs payments dispatched",
       "description": "These two lines should track each other. A sustained gap means sales are being recorded that never reach Payments — a product failure every panel above reports as healthy.",
-      "datasource": { "type": "cloudwatch", "uid": "${DS_CLOUDWATCH}" },
-      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 30 },
-      "fieldConfig": { "defaults": { "unit": "short", "custom": { "drawStyle": "line", "lineWidth": 2 } }, "overrides": [] },
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "${DS_CLOUDWATCH}"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 0,
+        "y": 30
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2
+          }
+        },
+        "overrides": []
+      },
       "targets": [
         {
           "refId": "A",
@@ -584,18 +980,35 @@
       "type": "timeseries",
       "title": "Money-correctness invariants — any non-zero value is an incident",
       "description": "Callback conflicts, reconcile mismatches and failed daily closes. None of these produce a 5xx, so none of them appear anywhere else on this dashboard.",
-      "datasource": { "type": "cloudwatch", "uid": "${DS_CLOUDWATCH}" },
-      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 30 },
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "${DS_CLOUDWATCH}"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 12,
+        "y": 30
+      },
       "fieldConfig": {
         "defaults": {
           "unit": "short",
           "min": 0,
-          "custom": { "drawStyle": "bars", "fillOpacity": 70 },
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 70
+          },
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 1 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
             ]
           }
         },
@@ -636,9 +1049,26 @@
       "type": "timeseries",
       "title": "Commission payouts per daily close",
       "description": "Counts attendants actually disbursed, not runs executed — one close covers every attendant in a tenant.",
-      "datasource": { "type": "cloudwatch", "uid": "${DS_CLOUDWATCH}" },
-      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 37 },
-      "fieldConfig": { "defaults": { "unit": "short", "custom": { "drawStyle": "bars", "fillOpacity": 60 } }, "overrides": [] },
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "${DS_CLOUDWATCH}"
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 24,
+        "x": 0,
+        "y": 37
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 60
+          }
+        },
+        "overrides": []
+      },
       "targets": [
         {
           "refId": "A",

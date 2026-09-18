@@ -15,6 +15,7 @@ locals {
     pos = {
       target_group = aws_lb_target_group.pos.arn_suffix
       owner        = "@aine-mbabazi"
+      runbook      = "#pos-5xx"
       symptom      = "POS is returning 5xx to attendants recording sales."
       impact       = "Attendants cannot record sales. Burns the POS 99.9% budget (40m 19s per 28 days) directly."
       first_action = "Check ECS service events for devops-g2-pos, then the /devops-g2/pos log group for readiness_check_failed — a database outage surfaces here first."
@@ -22,6 +23,7 @@ locals {
     payments = {
       target_group = aws_lb_target_group.payments.arn_suffix
       owner        = "@cheshari-pearl"
+      runbook      = "#payments-5xx"
       symptom      = "Payments is returning 5xx to POS and Commission."
       impact       = "STK pushes and B2C payouts are being rejected. A sale can still be recorded but cannot be paid. Burns the Payments 99.5% budget."
       first_action = "Check /devops-g2/payments for provider_dispatch_unconfirmed. Do NOT retry payouts by hand — reconciliation resolves pending state, a manual retry risks a double disbursement."
@@ -63,7 +65,7 @@ resource "aws_cloudwatch_metric_alarm" "service_5xx" {
     impact       = each.value.impact
     unit         = "5xx responses / 5 min"
     panel        = ""
-    runbook      = "#${each.key}-5xx"
+    runbook      = each.value.runbook
     first_action = each.value.first_action
   })
 
