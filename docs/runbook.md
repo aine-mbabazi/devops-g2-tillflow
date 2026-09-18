@@ -32,7 +32,10 @@ twice. If you are unsure, leave it pending and escalate.
   [RDS storage low](#rds-storage-low) ·
   [Unhealthy targets](#unhealthy-targets) ·
   [Synthetic probe failing](#synthetic-probe-failing) ·
-  [Alert delivery failing](#alert-delivery-failing)
+  [Alert delivery failing](#alert-delivery-failing) ·
+  [Cache degraded](#cache-degraded) ·
+  [Reconciliation queue age](#reconciliation-queue-age) ·
+  [Reconciliation DLQ](#reconciliation-dlq)
 - [Game day drills](#game-day-drills)
 
 ---
@@ -384,6 +387,76 @@ the weekly manual check below exists rather than trusting this alarm alone:
 aws sns publish --topic-arn <devops-g2-alerts> \
   --message '{"AlarmName":"manual-delivery-check","NewStateValue":"ALARM","NewStateReason":"Weekly verification [1.0 (manual)]","AlarmDescription":"{\"service\":\"reliability\",\"owner\":\"@mercykilonzo\",\"symptom\":\"Weekly alert-path verification. Not a real incident.\",\"impact\":\"None.\",\"first_action\":\"Acknowledge and ignore.\"}"}'
 ```
+
+---
+
+## Cache degraded
+
+**Symptom:** The cache is evicting keys, or is unreachable.
+**Impact:** No user-visible failure. Tenant config reads fall through to RDS, so
+POS latency drifts toward its 400 ms SLO and RDS load rises.
+
+POS is written to keep serving without the cache — every cache operation fails
+open. So this is a latency and capacity problem, never an availability one.
+
+1. Check the hit rate before resizing anything. A **low hit rate with high
+   evictions** means the working set does not fit; a **high hit rate with high
+   evictions** means the TTL is too long for the node size. Those have opposite
+   fixes.
+2. Check `/devops-g2/pos` for `cache_get_failed` and `cache_connect_failed`. If
+   those are present, the node is unreachable rather than full — look at the
+   security group and the `rediss://` scheme before the node size. Transit
+   encryption is on, so a `redis://` URL fails to connect and POS degrades
+   silently to Postgres forever.
+3. `cache_invalidation_failed` with `staleUntilTtl: true` is the one entry that
+   means users may be seeing **wrong** data rather than slow data: an owner
+   reconfigured their till and the old config is still cached. It self-corrects
+   within the TTL (60s by default).
+4. Turning the cache off entirely is a safe rollback: set `POS_CACHE=off` and
+   redeploy. POS runs exactly as it did before this ADR.
+
+---
+
+## Reconciliation queue age
+
+**Symptom:** Reconciliation messages are sitting unprocessed for more than 10
+minutes.
+**Impact:** Payments whose Daraja dispatch was unconfirmed are not being
+resolved. Sales stay pending at the till. Feeds directly into the callback-lag
+SLI.
+
+1. **Check whether the Payments tasks are running at all before touching the
+   queue.** A stalled consumer and a slow Daraja look identical from this
+   metric, and they have completely different fixes.
+2. If the consumer is alive, check Daraja's own status. A provider outage puts
+   every message into retry simultaneously.
+3. Do **not** purge the queue to clear the alarm. Each message is a payment
+   whose true state is unknown; discarding it discards the only prompt to go and
+   find out.
+
+---
+
+## Reconciliation DLQ
+
+**Symptom:** A payment could not be reconciled after five attempts and has
+landed in the dead-letter queue.
+**Impact:** At least one payment's true state is unknown to TillFlow. The
+customer may have been charged for a sale that will never close.
+
+**The alarm threshold is zero. One message is an incident.**
+
+1. Read the message — it carries the payment ID.
+2. Query Daraja directly for that payment. Establish what happened to the
+   customer's money before changing any record.
+3. **Do not redrive the queue until you know why it failed.** Five more attempts
+   against a permanently failing case just refills the DLQ and hides the next
+   genuine one behind it.
+4. If the failure was transient and is now fixed, redrive:
+   ```bash
+   aws sqs start-message-move-task \
+     --source-arn <devops-g2-reconciliation-dlq-arn> \
+     --destination-arn <devops-g2-reconciliation-arn>
+   ```
 
 ---
 
