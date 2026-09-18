@@ -9,6 +9,13 @@ terraform {
       source  = "hashicorp/random"
       version = "~> 3.6"
     }
+    # Packages the Slack notifier and the synthetic probe from source in this
+    # repo, so the deployed code is whatever is on the branch rather than a zip
+    # someone uploaded by hand.
+    archive = {
+      source  = "hashicorp/archive"
+      version = "~> 2.4"
+    }
   }
 }
 
@@ -23,6 +30,8 @@ provider "aws" {
 }
 
 data "aws_caller_identity" "current" {}
+
+data "aws_region" "current" {}
 
 data "aws_availability_zones" "available" {
   state = "available"
