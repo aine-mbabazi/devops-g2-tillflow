@@ -117,6 +117,26 @@ data "aws_iam_policy_document" "github_actions_permissions" {
     effect = "Allow"
     actions = [
       "apigateway:GET",
+      # Needed once these resources exist in state: every subsequent plan
+      # refreshes them, and a plan that cannot read a managed resource fails
+      # before it can report drift.
+      "cloudwatch:Describe*",
+      "cloudwatch:GetDashboard",
+      "cloudwatch:ListDashboards",
+      "cloudwatch:ListTagsForResource",
+      "sns:GetTopicAttributes",
+      "sns:GetSubscriptionAttributes",
+      "sns:ListTagsForResource",
+      "sns:ListSubscriptionsByTopic",
+      "lambda:GetFunction",
+      "lambda:GetFunctionConfiguration",
+      "lambda:GetPolicy",
+      "lambda:ListVersionsByFunction",
+      "kms:ListAliases",
+      "kms:GetKeyRotationStatus",
+      "scheduler:GetSchedule",
+      "synthetics:GetCanary",
+      "synthetics:ListTagsForResource",
       "ec2:Describe*",
       "ecs:Describe*",
       "ecs:List*",
