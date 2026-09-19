@@ -116,6 +116,7 @@ data "aws_iam_policy_document" "github_actions_permissions" {
     sid    = "TerraformReadForPlan"
     effect = "Allow"
     actions = [
+      "apigateway:GET",
       "ec2:Describe*",
       "ecs:Describe*",
       "ecs:List*",
