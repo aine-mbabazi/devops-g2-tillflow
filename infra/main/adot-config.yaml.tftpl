@@ -1,3 +1,7 @@
+# Rendered per service by templatefile(). It used to be a static file shared
+# by every task, which meant POS published its metrics into
+# TillFlow/payments and wrote them to the Payments log group — two
+# services' telemetry silently merged under one name.
 receivers:
   otlp:
     protocols:
@@ -15,8 +19,8 @@ exporters:
     region: us-east-2
   awsemf:
     region: us-east-2
-    namespace: TillFlow/payments
-    log_group_name: /devops-g2/payments
+    namespace: TillFlow/${service}
+    log_group_name: ${log_group}
     log_stream_name: otel-metrics
 
 extensions:

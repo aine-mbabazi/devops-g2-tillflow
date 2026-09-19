@@ -154,8 +154,35 @@ claim, with paste-ready commands and expected responses.
 
 ## Cost
 
-_(To be filled in once infra is provisioned — approximate monthly AWS cost
-based on chosen instance sizes and usage.)_
+List prices, `us-east-2`, on-demand. **Estimated from the published rate card,
+not a measured bill** — nothing has been applied long enough to produce one.
+
+| Component | Assumption | Est. monthly |
+|---|---|---|
+| NAT Gateway | 1, always on, before data processing | ~$33 |
+| ALB | 1, before LCU charges | ~$16 |
+| Synthetics canary | 1/min = 43,200 runs at $0.0012 | ~$52 |
+| RDS `db.t4g.micro` | single-AZ + 20 GB gp3 | ~$14 |
+| ECS Fargate | 2 tasks at 0.25 vCPU / 0.5 GB | ~$18 |
+| ElastiCache `cache.t4g.micro` | single node — arrives with PR #48 | ~$12 |
+| CloudWatch alarms | 16 at $0.10 | ~$2 |
+| Custom metrics | 8 log-derived at $0.30 | ~$2 |
+| KMS | 1 customer-managed key | ~$1 |
+| Lambda, S3, SQS, DynamoDB, Secrets Manager | at this volume | <$2 |
+| | | **~$152** |
+
+**The one-minute synthetic probe is the second-largest line item** — more than
+the database, and more than both application services combined. The brief
+specifies one minute, so it stays; dropping to five minutes would cost ~$10
+instead of ~$52, at the price of ~15 minutes' worst-case detection instead of
+~3. [`docs/capacity-model.md`](docs/capacity-model.md) argues that trade in
+full rather than leaving it an accident.
+
+The NAT gateway is the other line worth attention: VPC endpoints for ECR and
+Secrets Manager would cut its data-processing charges, though not its hourly
+rate.
+
+Costs stop when the stack is destroyed — see [Destroy](#destroy-cost-control--nat-gateway-and-alb-bill-continuously).
 
 ## Cleanup status
 
@@ -174,6 +201,7 @@ live or torn down, since the NAT Gateway and ALB bill continuously while running
 - [`docs/commission-payout-contract.md`](docs/commission-payout-contract.md) — proposed Commission → Payments B2C contract for G0 review
 - [`docs/adr/`](docs/adr/) — architecture decision records
 - [`docs/threat-model.md`](docs/threat-model.md) — threat model
+- [`docs/production-readiness.md`](docs/production-readiness.md) — production readiness review: what is solid, what would stop a real launch, and in what order to fix it
 - [`docs/slo-error-budgets.md`](docs/slo-error-budgets.md) — SLOs and error budgets
 - [`docs/runbook.md`](docs/runbook.md) — operational runbook: recovery objectives, rollback vs roll-forward, reconciliation order, restore, per-alarm response, game-day drills
 - [`docs/alert-contract.md`](docs/alert-contract.md) — the nine fields every Slack alert carries, and where they are stored
