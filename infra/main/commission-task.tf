@@ -12,7 +12,9 @@ resource "aws_ecs_task_definition" "commission" {
 
   container_definitions = jsonencode([
     {
-      name = "commission"
+      name                   = "commission"
+      readonlyRootFilesystem = true
+      mountPoints            = [{ sourceVolume = "tmp", containerPath = "/tmp", readOnly = false }]
       # Placeholder digest: the release-commission workflow registers a new
       # revision with the real digest on first deploy. Until then the
       # scheduled task cannot pull an image, which is why the schedule below
@@ -38,7 +40,45 @@ resource "aws_ecs_task_definition" "commission" {
         }
       }
     },
+    {
+      name                   = "adot-collector"
+      image                  = "public.ecr.aws/aws-observability/aws-otel-collector:v0.43.3"
+      essential              = false
+      readonlyRootFilesystem = true
+      mountPoints            = [{ sourceVolume = "tmp", containerPath = "/tmp", readOnly = false }]
+      portMappings = [
+        { containerPort = 4317, protocol = "tcp" },
+        { containerPort = 4318, protocol = "tcp" },
+      ]
+      environment = [
+        { name = "AOT_CONFIG_CONTENT", value = templatefile("${path.module}/adot-config.yaml.tftpl", {
+          service   = "commission"
+          log_group = aws_cloudwatch_log_group.commission.name
+        }) }
+      ]
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          "awslogs-group"         = aws_cloudwatch_log_group.commission.name
+          "awslogs-region"        = "us-east-2"
+          "awslogs-stream-prefix" = "adot"
+        }
+      }
+    },
   ])
+
+  # The brief requires every backend task to run application + ADOT sidecar,
+  # and Commission was the one that did not. It is also the task where a
+  # sidecar is most awkward: this is a one-shot worker, not a service. The
+  # collector is non-essential, so when the worker exits the task stops
+  # regardless of the collector's state — but spans buffered in the last
+  # moments of a run can be lost, because nothing waits for the collector to
+  # flush. Accepted: the daily close's evidence is its ledger writes and its
+  # structured logs, both durable, with traces as supporting detail.
+
+  volume {
+    name = "tmp"
+  }
 
   tags = merge(local.common_tags, { service = "commission" })
 

@@ -9,9 +9,11 @@ resource "aws_ecs_task_definition" "payments" {
 
   container_definitions = jsonencode([
     {
-      name      = "payments"
-      image     = "${local.account_id}.dkr.ecr.us-east-2.amazonaws.com/devops-g2/payments@sha256:7e23708cc0e1a412e2b471c38a1d8f4638f0bc3f45c040840cbdb3f0682f173b"
-      essential = true
+      name                   = "payments"
+      readonlyRootFilesystem = true
+      mountPoints            = [{ sourceVolume = "tmp", containerPath = "/tmp", readOnly = false }]
+      image                  = "${local.account_id}.dkr.ecr.us-east-2.amazonaws.com/devops-g2/payments@sha256:7e23708cc0e1a412e2b471c38a1d8f4638f0bc3f45c040840cbdb3f0682f173b"
+      essential              = true
       portMappings = [
         { containerPort = 3001, protocol = "tcp" }
       ]
@@ -50,8 +52,10 @@ resource "aws_ecs_task_definition" "payments" {
       }
     },
     {
-      name  = "adot-collector"
-      image = "public.ecr.aws/aws-observability/aws-otel-collector:v0.43.3"
+      name                   = "adot-collector"
+      readonlyRootFilesystem = true
+      mountPoints            = [{ sourceVolume = "tmp", containerPath = "/tmp", readOnly = false }]
+      image                  = "public.ecr.aws/aws-observability/aws-otel-collector:v0.43.3"
       # Non-essential so a collector crash does not kill the task. With no
       # start-order dependency either, a broken collector costs telemetry and
       # nothing else.
@@ -61,7 +65,10 @@ resource "aws_ecs_task_definition" "payments" {
         { containerPort = 4318, protocol = "tcp" }
       ]
       environment = [
-        { name = "AOT_CONFIG_CONTENT", value = file("${path.module}/adot-config.yaml") }
+        { name = "AOT_CONFIG_CONTENT", value = templatefile("${path.module}/adot-config.yaml.tftpl", {
+          service   = "payments"
+          log_group = aws_cloudwatch_log_group.payments.name
+        }) }
       ]
       logConfiguration = {
         logDriver = "awslogs"
@@ -80,6 +87,15 @@ resource "aws_ecs_task_definition" "payments" {
       }
     }
   ])
+
+
+  # Fargate does not support linuxParameters.tmpfs, so a read-only root
+  # filesystem needs a real mount for anything the runtime writes. This is an
+  # empty, non-persistent volume backed by the task's ephemeral storage: it
+  # lives for the task's lifetime and holds nothing worth keeping.
+  volume {
+    name = "tmp"
+  }
 
   tags = merge(local.common_tags, { service = "payments" })
 }

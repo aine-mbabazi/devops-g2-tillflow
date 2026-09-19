@@ -68,6 +68,29 @@ jobs:
 
           echo "image=$ECR_REGISTRY/$ECR_REPOSITORY@$DIGEST" >> "$GITHUB_OUTPUT"
 
+      # The SBOM is generated from the image that is actually being shipped,
+      # by digest, not from the source tree. A source-derived SBOM describes
+      # what the lockfile said; this describes what is in the artifact.
+      - name: Generate SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          image: ${{ steps.build.outputs.image }}
+          format: cyclonedx-json
+          output-file: sbom-pos.cdx.json
+          artifact-name: sbom-pos-${{ github.sha }}.cdx.json
+
+      # Captured before the deploy so there is something concrete to roll back
+      # to. Reading it afterwards would return the revision just deployed.
+      - name: Record the currently deployed task definition
+        id: previous
+        run: |
+          set -euo pipefail
+          PREV="$(aws ecs describe-services \
+            --cluster devops-g2 --services devops-g2-pos --region us-east-2 \
+            --query 'services[0].taskDefinition' --output text)"
+          echo "Currently deployed: $PREV"
+          echo "arn=$PREV" >> "$GITHUB_OUTPUT"
+
       - name: Download current task definition
         run: |
           aws ecs describe-task-definition \
@@ -90,3 +113,62 @@ jobs:
           service: devops-g2-pos
           cluster: devops-g2
           wait-for-service-stability: true
+
+      # Post-deploy smoke. wait-for-service-stability above proves ECS stopped
+      # churning; it does not prove the thing that is running is the thing that
+      # was built, or that a target is passing its health check.
+      - name: Post-deploy smoke
+        id: smoke
+        run: |
+          set -euo pipefail
+
+          echo "--- deployment reached a steady state with the new revision"
+          ROLLOUT="$(aws ecs describe-services \
+            --cluster devops-g2 --services devops-g2-pos --region us-east-2 \
+            --query 'services[0].deployments[?status==`PRIMARY`].rolloutState' --output text)"
+          echo "rolloutState=$ROLLOUT"
+          [ "$ROLLOUT" = "COMPLETED" ] || { echo "::error::rollout did not complete"; exit 1; }
+
+          echo "--- every target is healthy"
+          TG="$(aws elbv2 describe-target-groups \
+            --names devops-g2-pos-tg --region us-east-2 \
+            --query 'TargetGroups[0].TargetGroupArn' --output text)"
+          UNHEALTHY="$(aws elbv2 describe-target-health \
+            --target-group-arn "$TG" --region us-east-2 \
+            --query 'length(TargetHealthDescriptions[?TargetHealth.State!=`healthy`])' --output text)"
+          echo "unhealthy targets=$UNHEALTHY"
+          [ "$UNHEALTHY" = "0" ] || { echo "::error::$UNHEALTHY target(s) not healthy"; exit 1; }
+
+          # The check that actually ties runtime to the pipeline: the running
+          # task must be the exact digest this workflow pushed. A green
+          # rollout of the wrong image is the failure this catches.
+          echo "--- running image digest matches what was just built"
+          TASK_DEF="$(aws ecs describe-services \
+            --cluster devops-g2 --services devops-g2-pos --region us-east-2 \
+            --query 'services[0].taskDefinition' --output text)"
+          RUNNING="$(aws ecs describe-task-definition \
+            --task-definition "$TASK_DEF" --region us-east-2 \
+            --query "taskDefinition.containerDefinitions[?name=='pos'].image" --output text)"
+          EXPECTED="${{ steps.build.outputs.image }}"
+          echo "running=$RUNNING"
+          echo "expected=$EXPECTED"
+          [ "$RUNNING" = "$EXPECTED" ] || { echo "::error::deployed image is not the image built by this run"; exit 1; }
+
+          echo "smoke passed"
+
+      # Runs when the deploy or the smoke failed. ECS will happily sit on a
+      # broken-but-stable revision, so the rollback is explicit, and the job
+      # still fails afterwards — a recovered deploy is not a successful one.
+      - name: Roll back on failure
+        if: failure() && steps.previous.outputs.arn != ''
+        run: |
+          set -euo pipefail
+          echo "::warning::Deploy or smoke failed — rolling back to ${{ steps.previous.outputs.arn }}"
+          aws ecs update-service \
+            --cluster devops-g2 --service devops-g2-pos --region us-east-2 \
+            --task-definition "${{ steps.previous.outputs.arn }}" \
+            --force-new-deployment > /dev/null
+          aws ecs wait services-stable \
+            --cluster devops-g2 --services devops-g2-pos --region us-east-2
+          echo "Rolled back to ${{ steps.previous.outputs.arn }}"
+          exit 1

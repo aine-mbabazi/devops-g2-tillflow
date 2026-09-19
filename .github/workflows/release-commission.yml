@@ -63,6 +63,14 @@ jobs:
 
           echo "image=$ECR_REGISTRY/$ECR_REPOSITORY@$DIGEST" >> "$GITHUB_OUTPUT"
 
+      - name: Generate SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          image: ${{ steps.build.outputs.image }}
+          format: cyclonedx-json
+          output-file: sbom-commission.cdx.json
+          artifact-name: sbom-commission-${{ github.sha }}.cdx.json
+
       - name: Download current task definition
         run: |
           aws ecs describe-task-definition \
@@ -96,3 +104,15 @@ jobs:
             --region us-east-2 \
             --query 'taskDefinition.taskDefinitionArn' \
             --output text
+
+      # No post-deploy smoke or rollback here, deliberately. Commission is a
+      # one-shot worker on an EventBridge schedule, not an ECS service: this
+      # workflow registers a task definition revision, it does not start
+      # anything. There is no rollout to watch, no target to health-check, and
+      # nothing running to roll back — the next scheduled run picks up the
+      # latest ACTIVE revision.
+      #
+      # The equivalent safety net is the alarm on daily_close_failed plus the
+      # fact that a re-run is safe: the commissionRunId is derived from the UTC
+      # date, so re-running reuses the same idempotency keys and cannot
+      # double-pay. See docs/runbook.md#commission-close-failed.

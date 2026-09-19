@@ -9,9 +9,11 @@ resource "aws_ecs_task_definition" "pos" {
 
   container_definitions = jsonencode([
     {
-      name      = "pos"
-      image     = "${local.account_id}.dkr.ecr.us-east-2.amazonaws.com/devops-g2/pos@sha256:246eef859af48dc83f787f0dad764b682b1460bea9ce17a4a206ad536b0fb203"
-      essential = true
+      name                   = "pos"
+      readonlyRootFilesystem = true
+      mountPoints            = [{ sourceVolume = "tmp", containerPath = "/tmp", readOnly = false }]
+      image                  = "${local.account_id}.dkr.ecr.us-east-2.amazonaws.com/devops-g2/pos@sha256:246eef859af48dc83f787f0dad764b682b1460bea9ce17a4a206ad536b0fb203"
+      essential              = true
       portMappings = [
         { containerPort = 3002, protocol = "tcp" }
       ]
@@ -45,15 +47,20 @@ resource "aws_ecs_task_definition" "pos" {
       }
     },
     {
-      name      = "adot-collector"
-      image     = "public.ecr.aws/aws-observability/aws-otel-collector:latest"
-      essential = false
+      name                   = "adot-collector"
+      readonlyRootFilesystem = true
+      mountPoints            = [{ sourceVolume = "tmp", containerPath = "/tmp", readOnly = false }]
+      image                  = "public.ecr.aws/aws-observability/aws-otel-collector:latest"
+      essential              = false
       portMappings = [
         { containerPort = 4317, protocol = "tcp" },
         { containerPort = 4318, protocol = "tcp" }
       ]
       environment = [
-        { name = "AOT_CONFIG_CONTENT", value = file("${path.module}/adot-config.yaml") }
+        { name = "AOT_CONFIG_CONTENT", value = templatefile("${path.module}/adot-config.yaml.tftpl", {
+          service   = "pos"
+          log_group = aws_cloudwatch_log_group.pos.name
+        }) }
       ]
       logConfiguration = {
         logDriver = "awslogs"
@@ -65,6 +72,15 @@ resource "aws_ecs_task_definition" "pos" {
       }
     }
   ])
+
+
+  # Fargate does not support linuxParameters.tmpfs, so a read-only root
+  # filesystem needs a real mount for anything the runtime writes. This is an
+  # empty, non-persistent volume backed by the task's ephemeral storage: it
+  # lives for the task's lifetime and holds nothing worth keeping.
+  volume {
+    name = "tmp"
+  }
 
   tags = merge(local.common_tags, { service = "pos" })
 }

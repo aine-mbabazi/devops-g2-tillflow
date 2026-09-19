@@ -258,6 +258,49 @@ an accident.
 
 ---
 
+## CI/CD and golden path
+
+Second area owned by the same DRI ([`docs/ownership.md`](../../docs/ownership.md)).
+It has no evidence directory of its own — the brief names four areas and
+`ownership.md` splits CI/CD out as a fifth — so it is recorded here.
+
+**Every PR runs:** three service test suites, the Slack notifier tests, the
+runbook-anchor check, secret / dependency / IaC scanning (failing on fixable
+HIGH/CRITICAL), a Docker build validation, `terraform plan`, and a k6 smoke
+profile that includes the duplicate-dispatch threshold.
+
+**Every release runs:** build → push by digest → **SBOM** (CycloneDX, generated
+from the shipped image by digest, not from the source tree) → deploy →
+**post-deploy smoke** → **automated rollback on failure**.
+
+The smoke is three assertions, because `wait-for-service-stability` alone
+proves only that ECS stopped churning:
+
+1. The primary deployment reached `rolloutState = COMPLETED`.
+2. Zero unhealthy targets in the service's target group.
+3. **The running image digest equals the digest this run built.** A green
+   rollout of the wrong image is the failure this catches, and it is what ties
+   pipeline evidence to runtime.
+
+Payments additionally curls `/health` through API Gateway — it owns `/health`
+and `/ready` on the shared listener, so it is the one service reachable end to
+end from outside. POS is exposed only at `/sales*`, which needs a signed
+service-auth header the workflow deliberately does not hold.
+
+On failure, the previous task definition (captured *before* the deploy) is
+restored and the job still fails — a recovered deploy is not a successful one.
+
+Commission has no smoke or rollback, deliberately: it is a one-shot scheduled
+worker, so there is no rollout to watch and nothing running to roll back. Its
+safety net is the `daily_close_failed` alarm plus a re-run being provably safe.
+The workflow says so in place rather than being silently inconsistent.
+
+**Not proven:** no release workflow has run since these changes, so the smoke
+and the rollback are untested against a real deploy. Proving the rollback is
+the G4 "broken release" drill, which has not been run.
+
+---
+
 ## Not yet proven
 
 Stated plainly, because the assessment rule rewards reproducibility over
