@@ -21,13 +21,38 @@ function authHeader(tenantId) {
 
 test('configuration requires a service auth secret and validates URLs and POS_STORE', () => {
   assert.throws(() => loadConfig({}), /SERVICE_AUTH_SECRET/);
+  // The cache defaults to off: POS must stay runnable with no Valkey anywhere,
+  // locally, in CI, and in any environment where it is not provisioned yet.
   assert.deepEqual(loadConfig({ SERVICE_AUTH_SECRET: TEST_SECRET }), {
     host: '127.0.0.1', port: 3002, paymentsBaseUrl: 'http://127.0.0.1:3001',
     serviceAuthSecret: TEST_SECRET, posStore: 'memory', databaseUrl: undefined,
+    posCache: 'off', cacheUrl: undefined, cacheTtlSeconds: 60,
   });
   assert.throws(() => loadConfig({ SERVICE_AUTH_SECRET: TEST_SECRET, PAYMENTS_BASE_URL: 'not-a-url' }), /PAYMENTS_BASE_URL/);
   assert.throws(() => loadConfig({ SERVICE_AUTH_SECRET: TEST_SECRET, POS_STORE: 'postgres' }), /DATABASE_URL/);
   assert.throws(() => loadConfig({ SERVICE_AUTH_SECRET: TEST_SECRET, POS_STORE: 'bogus' }), /POS_STORE/);
+});
+
+test('cache configuration is validated at startup, not discovered at runtime', () => {
+  const base = { SERVICE_AUTH_SECRET: TEST_SECRET };
+  assert.throws(() => loadConfig({ ...base, POS_CACHE: 'memcached' }), /POS_CACHE/);
+  assert.throws(() => loadConfig({ ...base, POS_CACHE: 'redis' }), /CACHE_URL/);
+
+  // ElastiCache has transit encryption on, so a plain http-style or bare host
+  // URL must fail loudly here. Left to runtime it would fail to connect and
+  // POS would degrade to Postgres forever — a cache that appears to work and
+  // never hits, which is the worst of both.
+  assert.throws(() => loadConfig({ ...base, POS_CACHE: 'redis', CACHE_URL: 'cache.example.com:6379' }), /CACHE_URL/);
+
+  for (const ttl of ['0', '3601', 'sixty', '']) {
+    assert.throws(() => loadConfig({ ...base, CACHE_TTL_SECONDS: ttl }), /CACHE_TTL_SECONDS/);
+  }
+
+  const configured = loadConfig({
+    ...base, POS_CACHE: 'redis', CACHE_URL: 'rediss://cache.example.com:6379', CACHE_TTL_SECONDS: '30',
+  });
+  assert.equal(configured.posCache, 'redis');
+  assert.equal(configured.cacheTtlSeconds, 30);
 });
 
 async function startPaymentsServer(t) {

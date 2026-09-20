@@ -82,14 +82,50 @@ That is the whole point: the service booted on Fargate, connected to RDS,
 and answered its readiness probe — which runs SELECT 1 against the real
 database.
 
+### Caching (added on this branch)
+
+Valkey on ElastiCache, single node, `cache.t4g.micro`, private subnets, transit
+and at-rest encryption on, reachable only from the ECS tasks' security group.
+`infra/main/elasticache.tf`.
+
+Cache-aside covers `GET /tenants/:id/config` and nothing else. It is the
+read-heavy path — an attendant's screen re-reads till config far more often
+than a sale is recorded — and it is written only when an owner reconfigures.
+**Nothing about money is cached**: sale and payment state is read from Postgres
+every time, because a stale payment status is how a double charge happens.
+
+Implemented as a decorator (`CachingTenantStore`) over the existing store rather
+than inside it, so the persistence class stays cache-free and the in-memory
+store used by tests is untouched. Every cache operation fails open — a Valkey
+outage costs latency, not availability. Rationale and alternatives in
+[ADR 0004](../../docs/adr/0004-caching-and-queueing.md).
+
+### Async (added on this branch)
+
+`devops-g2-reconciliation` with `devops-g2-reconciliation-dlq` behind it after
+five receives. `infra/main/sqs.tf`. Long polling, a 60-second visibility
+timeout, SSE on both queues, and access scoped to the Payments task role alone.
+
+The queue exists to resolve payments whose Daraja dispatch was unconfirmed —
+work that was previously done by a person reading
+`provider_dispatch_unconfirmed` in CloudWatch Logs. Alarms cover queue age
+(bounded at 10 minutes) and DLQ depth (threshold zero: one message is a payment
+nobody can account for).
+
 ## Known gaps (deferred to G3)
 API Gateway + VPC Link — the ALB is internal-only, so there is no
-public entry point yet. Planned for G3.
+public entry point yet. The Terraform exists on a separate branch
+([#46](https://github.com/aine-mbabazi/devops-g2-tillflow/pull/46)).
 
-ElastiCache (Redis/Valkey) — not provisioned. Services talk to RDS
-directly; the cache-aside layer is a G3 item.
+**The reconciliation queue has no consumer yet.** The queues, the redrive
+policy, the IAM and the alarms are all provisioned, but nothing in
+`services/payments` publishes to or reads from them. The message contract is
+specified in ADR 0004; wiring the producer and consumer is Payments + integrity
+work and belongs to @cheshari-pearl, not to this branch. Until that lands, the
+DLQ alarm is provisioned-but-unexercised.
 
-SQS + DLQ — not provisioned. Nothing async yet.
+Neither the cache nor the queues have been applied to AWS — `terraform
+validate` passes, no `terraform apply` has run from this branch.
 
 One NAT gateway, one AZ RDS — accepted cost trade-off recorded in
 ADR 0002, not an oversight.

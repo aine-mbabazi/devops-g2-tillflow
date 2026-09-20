@@ -22,6 +22,12 @@ resource "aws_ecs_task_definition" "pos" {
         { name = "PORT", value = "3002" },
         { name = "PAYMENTS_BASE_URL", value = "http://${aws_lb.main.dns_name}" },
         { name = "POS_STORE", value = "postgres" },
+        { name = "POS_CACHE", value = "redis" },
+        # rediss://, not redis:// — the replication group has transit
+        # encryption enabled, and loadConfig rejects a plain scheme at startup
+        # rather than letting POS degrade silently to Postgres forever.
+        { name = "CACHE_URL", value = "rediss://${aws_elasticache_replication_group.main.primary_endpoint_address}:6379" },
+        { name = "CACHE_TTL_SECONDS", value = "60" },
         { name = "OTEL_SERVICE_NAME", value = "pos" },
         { name = "OTEL_EXPORTER_OTLP_ENDPOINT", value = "http://localhost:4318" },
         { name = "OTEL_EXPORTER_OTLP_PROTOCOL", value = "http/protobuf" }

@@ -274,6 +274,53 @@ data "aws_iam_policy_document" "github_apply_permissions" {
     ]
     resources = ["arn:aws:secretsmanager:us-east-2:${local.account_id}:secret:${local.name_prefix}/*"]
   }
+
+  # The cache. Resource-scopable actions are scoped; the Describe* calls
+  # Terraform makes on every refresh are not — ElastiCache's describe APIs
+  # return account-wide collections and have no resource dimension.
+  statement {
+    sid    = "ManageCache"
+    effect = "Allow"
+    actions = [
+      "elasticache:Create*",
+      "elasticache:Delete*",
+      "elasticache:Modify*",
+      "elasticache:AddTagsToResource",
+      "elasticache:RemoveTagsFromResource",
+      "elasticache:ListTagsForResource",
+    ]
+    resources = [
+      "arn:aws:elasticache:us-east-2:${local.account_id}:replicationgroup:${local.name_prefix}-*",
+      "arn:aws:elasticache:us-east-2:${local.account_id}:subnetgroup:${local.name_prefix}-*",
+      "arn:aws:elasticache:us-east-2:${local.account_id}:parametergroup:${local.name_prefix}-*",
+    ]
+  }
+
+  statement {
+    sid       = "ReadCacheForPlan"
+    effect    = "Allow"
+    actions   = ["elasticache:Describe*"]
+    resources = ["*"]
+  }
+
+  # SQS supports resource-level permissions on every action Terraform needs
+  # here, so this one is fully scoped to the group prefix — no account-wide
+  # companion statement required.
+  statement {
+    sid    = "ManageQueues"
+    effect = "Allow"
+    actions = [
+      "sqs:CreateQueue",
+      "sqs:DeleteQueue",
+      "sqs:GetQueueAttributes",
+      "sqs:SetQueueAttributes",
+      "sqs:GetQueueUrl",
+      "sqs:ListQueueTags",
+      "sqs:TagQueue",
+      "sqs:UntagQueue",
+    ]
+    resources = ["arn:aws:sqs:us-east-2:${local.account_id}:${local.name_prefix}-*"]
+  }
 }
 
 resource "aws_iam_role_policy" "github_actions_apply" {

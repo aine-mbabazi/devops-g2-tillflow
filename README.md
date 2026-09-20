@@ -116,6 +116,22 @@ holds no ongoing cost beyond negligible S3/DynamoDB storage.
   [`observability/grafana/tillflow-slo-dashboard.json`](observability/grafana/tillflow-slo-dashboard.json)
   and imports against a CloudWatch datasource.
 
+## Caching and async
+
+- **Cache-aside** on `GET /tenants/:id/config` via Valkey on ElastiCache. Off
+  unless configured (`POS_CACHE=redis` + `CACHE_URL`), and every cache
+  operation fails open — a cache outage costs latency, not availability. Note
+  the URL must be `rediss://`: transit encryption is on, and `loadConfig`
+  rejects a plain scheme at startup rather than letting POS degrade silently to
+  Postgres forever.
+- **Nothing about money is cached.** Sale and payment state is read from
+  Postgres every time.
+- **`devops-g2-reconciliation` + its DLQ** resolve payments whose Daraja
+  dispatch was unconfirmed. Alarms bound the queue age at 10 minutes and fire on
+  any DLQ message at all.
+- Rationale, alternatives and consequences:
+  [ADR 0004](docs/adr/0004-caching-and-queueing.md).
+
 ## Reliability and operations
 
 - **Alerting:** CloudWatch alarm → SNS → a small Lambda renderer → Slack. Every
@@ -199,7 +215,7 @@ live or torn down, since the NAT Gateway and ALB bill continuously while running
 - [`docs/architecture.md`](docs/architecture.md) — system architecture
 - [`docs/payment-contract.md`](docs/payment-contract.md) — proposed POS → Payments contract for G0 review
 - [`docs/commission-payout-contract.md`](docs/commission-payout-contract.md) — proposed Commission → Payments B2C contract for G0 review
-- [`docs/adr/`](docs/adr/) — architecture decision records
+- [`docs/adr/`](docs/adr/) — architecture decision records, including [0004 — caching and queueing](docs/adr/0004-caching-and-queueing.md)
 - [`docs/threat-model.md`](docs/threat-model.md) — threat model
 - [`docs/production-readiness.md`](docs/production-readiness.md) — production readiness review: what is solid, what would stop a real launch, and in what order to fix it
 - [`docs/slo-error-budgets.md`](docs/slo-error-budgets.md) — SLOs and error budgets
