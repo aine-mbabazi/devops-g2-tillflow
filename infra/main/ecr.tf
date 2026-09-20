@@ -31,6 +31,17 @@ resource "aws_ecr_repository" "commission" {
   tags = merge(local.common_tags, { service = "commission" })
 }
 
+resource "aws_ecr_repository" "web" {
+  name                 = "${local.name_prefix}/web"
+  image_tag_mutability = "IMMUTABLE"
+
+  image_scanning_configuration {
+    scan_on_push = true
+  }
+
+  tags = merge(local.common_tags, { service = "web" })
+}
+
 output "payments_ecr_repository_url" {
   value = aws_ecr_repository.payments.repository_url
 }
@@ -41,6 +52,10 @@ output "pos_ecr_repository_url" {
 
 output "commission_ecr_repository_url" {
   value = aws_ecr_repository.commission.repository_url
+}
+
+output "web_ecr_repository_url" {
+  value = aws_ecr_repository.web.repository_url
 }
 
 # Registry-level ENHANCED scanning, which is what the brief asks for.

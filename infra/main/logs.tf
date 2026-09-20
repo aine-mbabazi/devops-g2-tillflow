@@ -15,3 +15,9 @@ resource "aws_cloudwatch_log_group" "commission" {
   retention_in_days = 14
   tags              = merge(local.common_tags, { service = "commission" })
 }
+
+resource "aws_cloudwatch_log_group" "web" {
+  name              = "/${local.name_prefix}/web"
+  retention_in_days = 14
+  tags              = merge(local.common_tags, { service = "web" })
+}
