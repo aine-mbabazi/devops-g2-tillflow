@@ -32,8 +32,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run tests
-        run: npm test
+      - name: Lint
+        run: npm run lint
+
+      - name: Run tests with coverage (70% line floor)
+        run: npm run coverage
 
   pos-tests:
     name: POS — lint & test
@@ -47,9 +50,17 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: npm
+          cache-dependency-path: services/pos/package-lock.json
 
-      - name: Run tests
-        run: npm test
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Run tests with coverage (70% line floor)
+        run: npm run coverage
 
   commission-tests:
     name: Commission — lint & test
@@ -63,9 +74,17 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: npm
+          cache-dependency-path: services/commission/package-lock.json
 
-      - name: Run tests
-        run: npm test
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Run tests with coverage (70% line floor)
+        run: npm run coverage
 
   runbook-anchors:
     name: Alarms — runbook anchors resolve
