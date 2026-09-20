@@ -1,0 +1,14 @@
+{"ts":"2026-09-20T20:54:52.732Z","event":"drill_started","drill":"callback-replay","base":"http://127.0.0.1:57081"}
+{"ts":"2026-09-20T20:54:52.762Z","event":"http_request","route":"POST /payments","statusCode":202}
+{"ts":"2026-09-20T20:54:52.766Z","event":"drill_step","step":1,"description":"POST the original terminal callback (verified: succeeded)"}
+{"ts":"2026-09-20T20:54:52.768Z","event":"callback_processed","paymentId":"payment_551836d0-735d-4936-96b9-878312773548","status":"succeeded","callbackLagMs":7}
+{"ts":"2026-09-20T20:54:52.769Z","event":"http_request","route":"POST /payments/callbacks/daraja","statusCode":200}
+{"ts":"2026-09-20T20:54:52.770Z","event":"drill_assertion","step":1,"result":"pass","detail":"one legal transition, one callback_processed"}
+{"ts":"2026-09-20T20:54:52.770Z","event":"drill_step","step":2,"description":"Replay the identical callback (re-verifies as: succeeded, unchanged)"}
+{"ts":"2026-09-20T20:54:52.771Z","event":"http_request","route":"POST /payments/callbacks/daraja","statusCode":200}
+{"ts":"2026-09-20T20:54:52.771Z","event":"drill_assertion","step":2,"result":"pass","detail":"replay was a no-op: still exactly one callback_processed, ledger effect not repeated"}
+{"ts":"2026-09-20T20:54:52.771Z","event":"drill_step","step":3,"description":"POST a reordered callback whose re-verification now disagrees (verified: failed)"}
+{"ts":"2026-09-20T20:54:52.772Z","event":"callback_conflict","paymentId":"payment_551836d0-735d-4936-96b9-878312773548","storedStatus":"succeeded","verifiedStatus":"failed"}
+{"ts":"2026-09-20T20:54:52.773Z","event":"http_request","route":"POST /payments/callbacks/daraja","statusCode":200}
+{"ts":"2026-09-20T20:54:52.773Z","event":"drill_assertion","step":3,"result":"pass","detail":"conflict logged with both statuses; stored state untouched — one ledger effect for the whole drill"}
+{"ts":"2026-09-20T20:54:52.773Z","event":"drill_completed","drill":"callback-replay","result":"pass"}

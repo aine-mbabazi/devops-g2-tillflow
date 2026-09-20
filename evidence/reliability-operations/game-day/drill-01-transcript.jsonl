@@ -1,0 +1,15 @@
+{"ts":"2026-09-20T20:54:52.581Z","event":"drill_started","drill":"uncertain-payment","base":"http://127.0.0.1:57078"}
+{"ts":"2026-09-20T20:54:52.583Z","event":"drill_step","step":1,"description":"POST /payments — force a Daraja dispatch timeout"}
+{"ts":"2026-09-20T20:54:52.608Z","event":"provider_dispatch_unconfirmed","paymentId":"payment_8f760bbc-7305-4228-8bb9-bfe775f3aa75","code":"DARAJA_TIMEOUT"}
+{"ts":"2026-09-20T20:54:52.609Z","event":"http_request","route":"POST /payments","statusCode":202}
+{"ts":"2026-09-20T20:54:52.614Z","event":"drill_assertion","step":1,"result":"pass","detail":"payment pending, no decline, one reconciliation message enqueued"}
+{"ts":"2026-09-20T20:54:52.614Z","event":"drill_step","step":2,"description":"Re-POST the identical sale with the same idempotency key"}
+{"ts":"2026-09-20T20:54:52.616Z","event":"http_request","route":"POST /payments","statusCode":202}
+{"ts":"2026-09-20T20:54:52.617Z","event":"drill_assertion","step":2,"result":"pass","detail":"retry is idempotent — dispatchCalls still 1"}
+{"ts":"2026-09-20T20:54:52.617Z","event":"drill_step","step":3,"description":"Automated reconciler attempts the enqueued message"}
+{"ts":"2026-09-20T20:54:52.617Z","event":"drill_assertion","step":3,"result":"pass","detail":"no providerRequestId => processMessage leaves it pending, per its own guard, headed for the DLQ per docs/runbook.md#reconciliation-dlq"}
+{"ts":"2026-09-20T20:54:52.617Z","event":"drill_step","step":4,"description":"Simulated DLQ step: operator confirms the true outcome with Daraja out-of-band and resolves the record"}
+{"ts":"2026-09-20T20:54:52.617Z","event":"manual_dlq_resolution","paymentId":"payment_8f760bbc-7305-4228-8bb9-bfe775f3aa75","status":"succeeded"}
+{"ts":"2026-09-20T20:54:52.618Z","event":"http_request","route":"GET /payments/:id","statusCode":200}
+{"ts":"2026-09-20T20:54:52.618Z","event":"drill_assertion","step":5,"result":"pass","detail":"terminal state reached; exactly one dispatch attempt ever existed"}
+{"ts":"2026-09-20T20:54:52.619Z","event":"drill_completed","drill":"uncertain-payment","result":"pass"}

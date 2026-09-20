@@ -306,17 +306,15 @@ the G4 "broken release" drill, which has not been run.
 Stated plainly, because the assessment rule rewards reproducibility over
 explanation and these are the places where neither yet exists.
 
-- **No game day has been run.** All five drills are specified in the runbook
-  with hypotheses and success criteria; none has been executed. This is the
-  largest remaining gap in this area, and the one that blocks G4.
+- **Game day: 2 of 5 drills run.** Drills 1 (uncertain payment) and 2
+  (callback replay) are executed and passing — see "Game day — drills 1 & 2
+  confirmed" below. Drills 3 (platform failure), 4 (broken release) and 5
+  (restore) still need real AWS infra to exercise (stopping a live task,
+  deploying a broken image, restoring an RDS snapshot) and have not been run.
+  That is the remaining gap blocking G4.
 - **RTO and RPO are asserted, not measured.** The 30-minute and 5-minute figures
   are design intent derived from how the mechanisms work. Only the restore drill
   converts them into evidence.
-- **No Slack message has actually been delivered.** The renderer is unit tested
-  and the path is provisioned in code, but nothing from this branch has been
-  applied to AWS, so no alert has round-tripped to a real channel. Capturing one
-  firing and one recovery message is a five-minute task once `terraform apply`
-  runs and the webhook secret is populated.
 - **The probe has never run.** It stays unprovisioned until
   `synthetic_probe_url` is set, which needs the API Gateway branch merged and
   applied first.
@@ -364,3 +362,53 @@ reflect genuine operational behavior rather than a smoothed-over demo:
 `{"event":"alert_delivered","alarm":"test-manual-trigger","state":"OK"}`.
 Both the firing and recovery notifications from a single alarm's lifecycle
 were delivered to Slack in this session.
+
+## Game day — drills 1 & 2 confirmed, 2026-09-20
+
+Executed against the real `app.js` / `payment-store.js` / `reconciliation-queue.js`
+code, over real HTTP, on an ephemeral local server — DARAJA_MODE=fake per the
+project's deterministic-adapter rule. Only the Daraja transport is a stub;
+everything else is the actual production code path. Full JSON transcripts are
+in `game-day/drill-01-transcript.jsonl` and `game-day/drill-02-transcript.jsonl`.
+
+**Drill 1 — Uncertain payment** (`docs/runbook.md#game-day-drills`)
+
+```bash
+node evidence/reliability-operations/game-day/drill-01-uncertain-payment.mjs
+```
+
+Forces a Daraja dispatch timeout on the first attempt, confirms
+`provider_dispatch_unconfirmed` is logged and the payment stays `pending`
+(never declined), re-POSTs the identical sale with the same idempotency key
+and confirms zero additional Daraja dispatches, then proves the automated
+reconciler's own `processMessage` correctly *refuses* to resolve a payment
+with no provider ID (`reconciliation-queue.js`'s guard) rather than guessing —
+which is exactly why `docs/runbook.md#reconciliation-dlq` exists. The drill
+completes the loop the way that DLQ procedure prescribes: an operator
+confirms the true outcome with Daraja out-of-band, and the record is resolved
+through the same `store.transition()` primitive the automated reconciler
+itself uses once it has a confirmed answer. Result: exactly one Daraja
+dispatch attempt for the whole drill, and a terminal state reached without
+ever inferring an outcome from the timeout. All 5 assertions pass.
+
+**Drill 2 — Callback replay** (`docs/runbook.md#game-day-drills`)
+
+```bash
+node evidence/reliability-operations/game-day/drill-02-callback-replay.mjs
+```
+
+Drives the original terminal callback (payment → `succeeded`, one
+`callback_processed`), replays the identical callback (re-verifies as
+`succeeded` again — a true no-op: still exactly one `callback_processed`,
+stored state unchanged), then sends a reordered callback whose
+re-verification disagrees with what's already recorded (`failed`). The
+disagreement is logged as `callback_conflict` with both the stored and
+verified status, the stored state is left untouched, and no second ledger
+effect occurs. All 3 assertions pass — one legal transition, one ledger
+effect, for the entire drill.
+
+**Known scope limit, stated plainly:** both drills run against in-memory
+stores on an ephemeral local server, not the deployed ECS/RDS stack — same
+caveat as the k6 capacity runs above. They prove the invariants hold in the
+real code; they do not prove the deployed infrastructure carries them
+through. Drills 3–5 need the live stack and have not been run.
