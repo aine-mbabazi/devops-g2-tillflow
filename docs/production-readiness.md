@@ -98,7 +98,7 @@ out", which is not the same as knowing.
 |---|---|---|
 | **No TLS in the VPC.** API Gateway terminates HTTPS, then forwards over plain HTTP to the ALB and on to the tasks. | Traffic including `X-Service-Auth` tokens and payment payloads is readable by anything on the VPC path. | Private subnets, security groups scoped to peers. Not sufficient for real card/mobile-money traffic. |
 | **Service auth is a shared HMAC secret**, distributed via Secrets Manager. | One secret compromise impersonates every caller for every tenant. No per-caller identity, no rotation story. | Short 5-minute token window; tenant is bound into the signature. |
-| **No end-user authentication at all.** | The system authenticates *services*, not the attendant or owner. The web tier that would carry user identity does not exist. | None. This is a product gap, not a hardening gap. |
+| **No end-user authentication at all.** | The system authenticates *services*, not the attendant or owner. `services/web` is a real deployed API shell (`docs/architecture.md`), but it carries no user identity layer of its own — every route requires the same shared service-auth token POS and Payments require. | None. This is a product gap, not a hardening gap. |
 | **No WAF on API Gateway.** | Public entry point with no rate limiting or request filtering. | None. |
 | **`skip_final_snapshot = true`, `deletion_protection = false` on RDS.** | `terraform destroy` silently discards the payment ledger. | Deliberate for a demo that tears down between gates. Both must flip before real data exists. |
 

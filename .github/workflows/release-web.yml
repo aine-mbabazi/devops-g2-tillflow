@@ -1,0 +1,199 @@
+name: Deploy Web
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'services/web/**'
+      - 'services/_shared/**'
+      - '.github/workflows/release-web.yml'
+
+permissions:
+  contents: read
+  id-token: write
+
+# Never cancel: a cancelled run can leave the service mid-rollout with the
+# deployment circuit breaker still watching it.
+concurrency:
+  group: release-web
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    name: Build, push, and deploy Web
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_CI_ROLE_ARN }}
+          aws-region: us-east-2
+
+      - name: Login to ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push image
+        id: build
+        env:
+          ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          ECR_REPOSITORY: devops-g2/web
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          # The ECR repository is IMMUTABLE, so re-running this workflow on a
+          # commit that was already built fails the push. Reuse the existing
+          # image instead: same commit, same digest, so the deploy below is
+          # still exact.
+          DIGEST="$(aws ecr describe-images \
+            --repository-name "$ECR_REPOSITORY" \
+            --image-ids imageTag="$IMAGE_TAG" \
+            --region us-east-2 \
+            --query 'imageDetails[0].imageDigest' \
+            --output text 2>/dev/null || true)"
+
+          if [ -n "$DIGEST" ] && [ "$DIGEST" != "None" ]; then
+            echo "Image for $IMAGE_TAG already in ECR, reusing $DIGEST"
+          else
+            # Built from the repo root so services/_shared is in the context.
+            docker build -f services/web/Dockerfile -t "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" .
+            docker push "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+            # Read the digest back from the pushed image rather than querying
+            # the registry again, so the deploy uses the bytes just pushed.
+            DIGEST="$(docker inspect --format='{{index .RepoDigests 0}}' \
+              "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" | cut -d@ -f2)"
+          fi
+
+          echo "image=$ECR_REGISTRY/$ECR_REPOSITORY@$DIGEST" >> "$GITHUB_OUTPUT"
+
+      # The SBOM is generated from the image that is actually being shipped,
+      # by digest, not from the source tree. A source-derived SBOM describes
+      # what the lockfile said; this describes what is in the artifact.
+      - name: Generate SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          image: ${{ steps.build.outputs.image }}
+          format: cyclonedx-json
+          output-file: sbom-web.cdx.json
+          artifact-name: sbom-web-${{ github.sha }}.cdx.json
+
+      # Captured before the deploy so there is something concrete to roll back
+      # to. Reading it afterwards would return the revision just deployed.
+      - name: Record the currently deployed task definition
+        id: previous
+        run: |
+          set -euo pipefail
+          PREV="$(aws ecs describe-services \
+            --cluster devops-g2 --services devops-g2-web --region us-east-2 \
+            --query 'services[0].taskDefinition' --output text)"
+          echo "Currently deployed: $PREV"
+          echo "arn=$PREV" >> "$GITHUB_OUTPUT"
+
+      - name: Download current task definition
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition devops-g2-web \
+            --region us-east-2 \
+            --query 'taskDefinition' > task-def.json
+
+      - name: Render new task definition with updated image
+        id: render
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: task-def.json
+          container-name: web
+          image: ${{ steps.build.outputs.image }}
+
+      - name: Deploy to ECS
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.render.outputs.task-definition }}
+          service: devops-g2-web
+          cluster: devops-g2
+          wait-for-service-stability: true
+
+      # Post-deploy smoke. wait-for-service-stability above proves ECS stopped
+      # churning; it does not prove the thing that is running is the thing that
+      # was built, or that a target is passing its health check.
+      - name: Post-deploy smoke
+        id: smoke
+        run: |
+          set -euo pipefail
+
+          echo "--- deployment reached a steady state with the new revision"
+          ROLLOUT="$(aws ecs describe-services \
+            --cluster devops-g2 --services devops-g2-web --region us-east-2 \
+            --query 'services[0].deployments[?status==`PRIMARY`].rolloutState' --output text)"
+          echo "rolloutState=$ROLLOUT"
+          [ "$ROLLOUT" = "COMPLETED" ] || { echo "::error::rollout did not complete"; exit 1; }
+
+          echo "--- every target is healthy"
+          # Two things this has to account for, not one:
+          # 1. ECS reporting the rollout COMPLETED does not mean the ALB
+          #    target group has caught up: healthy_threshold=2 x
+          #    interval=30s means a freshly-registered target can take up
+          #    to ~60s to flip healthy. Poll instead of checking once.
+          # 2. This target group has no deregistration_delay override, so
+          #    it defaults to 300s. At desired_count=1, ECS briefly runs
+          #    old+new together during a rollout, and the old target sits
+          #    in the target group as "draining" for up to that long —
+          #    that's expected, not a failure. Only "unhealthy" /
+          #    "unavailable" states indicate an actual problem; treating
+          #    every non-"healthy" state as a failure counted the old
+          #    task's normal drain-out as a broken deploy.
+          TG="$(aws elbv2 describe-target-groups \
+            --names devops-g2-web-tg --region us-east-2 \
+            --query 'TargetGroups[0].TargetGroupArn' --output text)"
+          ATTEMPTS=12
+          SLEEP_SECONDS=10
+          BAD="" HEALTHY_COUNT=""
+          for i in $(seq 1 "$ATTEMPTS"); do
+            HEALTH_JSON="$(aws elbv2 describe-target-health \
+              --target-group-arn "$TG" --region us-east-2)"
+            BAD="$(echo "$HEALTH_JSON" | jq '[.TargetHealthDescriptions[] | select(.TargetHealth.State=="unhealthy" or .TargetHealth.State=="unavailable")] | length')"
+            HEALTHY_COUNT="$(echo "$HEALTH_JSON" | jq '[.TargetHealthDescriptions[] | select(.TargetHealth.State=="healthy")] | length')"
+            echo "attempt $i/$ATTEMPTS: bad=$BAD healthy=$HEALTHY_COUNT"
+            [ "$BAD" = "0" ] && [ "$HEALTHY_COUNT" -ge "1" ] && break
+            sleep "$SLEEP_SECONDS"
+          done
+          { [ "$BAD" = "0" ] && [ "$HEALTHY_COUNT" -ge "1" ]; } || {
+            echo "::error::target group unhealthy after $((ATTEMPTS * SLEEP_SECONDS))s (bad=$BAD healthy=$HEALTHY_COUNT)"
+            aws elbv2 describe-target-health --target-group-arn "$TG" --region us-east-2
+            exit 1
+          }
+
+          # The check that actually ties runtime to the pipeline: the running
+          # task must be the exact digest this workflow pushed. A green
+          # rollout of the wrong image is the failure this catches.
+          echo "--- running image digest matches what was just built"
+          TASK_DEF="$(aws ecs describe-services \
+            --cluster devops-g2 --services devops-g2-web --region us-east-2 \
+            --query 'services[0].taskDefinition' --output text)"
+          RUNNING="$(aws ecs describe-task-definition \
+            --task-definition "$TASK_DEF" --region us-east-2 \
+            --query "taskDefinition.containerDefinitions[?name=='web'].image" --output text)"
+          EXPECTED="${{ steps.build.outputs.image }}"
+          echo "running=$RUNNING"
+          echo "expected=$EXPECTED"
+          [ "$RUNNING" = "$EXPECTED" ] || { echo "::error::deployed image is not the image built by this run"; exit 1; }
+
+          echo "smoke passed"
+
+      # Runs when the deploy or the smoke failed. ECS will happily sit on a
+      # broken-but-stable revision, so the rollback is explicit, and the job
+      # still fails afterwards — a recovered deploy is not a successful one.
+      - name: Roll back on failure
+        if: failure() && steps.previous.outputs.arn != ''
+        run: |
+          set -euo pipefail
+          echo "::warning::Deploy or smoke failed — rolling back to ${{ steps.previous.outputs.arn }}"
+          aws ecs update-service \
+            --cluster devops-g2 --service devops-g2-web --region us-east-2 \
+            --task-definition "${{ steps.previous.outputs.arn }}" \
+            --force-new-deployment > /dev/null
+          aws ecs wait services-stable \
+            --cluster devops-g2 --services devops-g2-web --region us-east-2
+          echo "Rolled back to ${{ steps.previous.outputs.arn }}"
+          exit 1
