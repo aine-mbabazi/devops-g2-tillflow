@@ -1,0 +1,212 @@
+{
+    "taskDefinitionArn": "arn:aws:ecs:us-east-2:240462142849:task-definition/devops-g2-payments:22",
+    "containerDefinitions": [
+        {
+            "name": "payments",
+            "image": "240462142849.dkr.ecr.us-east-2.amazonaws.com/devops-g2/payments@sha256:fd027598d4eb5e1c59ac699dffd8222b4fcf5b6298f230a05508714ed8520b74",
+            "cpu": 0,
+            "portMappings": [
+                {
+                    "containerPort": 3001,
+                    "hostPort": 3001,
+                    "protocol": "tcp"
+                }
+            ],
+            "essential": true,
+            "environment": [
+                {
+                    "name": "OTEL_SERVICE_NAME",
+                    "value": "payments"
+                },
+                {
+                    "name": "OTEL_EXPORTER_OTLP_PROTOCOL",
+                    "value": "http/protobuf"
+                },
+                {
+                    "name": "AWS_REGION",
+                    "value": "us-east-2"
+                },
+                {
+                    "name": "PORT",
+                    "value": "3001"
+                },
+                {
+                    "name": "RECONCILIATION_QUEUE_URL",
+                    "value": "https://sqs.us-east-2.amazonaws.com/240462142849/devops-g2-reconciliation"
+                },
+                {
+                    "name": "HOST",
+                    "value": "0.0.0.0"
+                },
+                {
+                    "name": "DARAJA_MODE",
+                    "value": "fake"
+                },
+                {
+                    "name": "PAYMENT_STORE",
+                    "value": "postgres"
+                },
+                {
+                    "name": "OTEL_EXPORTER_OTLP_ENDPOINT",
+                    "value": "http://localhost:4318"
+                }
+            ],
+            "mountPoints": [
+                {
+                    "sourceVolume": "tmp",
+                    "containerPath": "/tmp",
+                    "readOnly": false
+                }
+            ],
+            "volumesFrom": [],
+            "secrets": [
+                {
+                    "name": "SERVICE_AUTH_SECRET",
+                    "valueFrom": "arn:aws:secretsmanager:us-east-2:240462142849:secret:devops-g2/service-auth-secret-otH3MS"
+                },
+                {
+                    "name": "DATABASE_URL",
+                    "valueFrom": "arn:aws:secretsmanager:us-east-2:240462142849:secret:devops-g2/database-url-8uzLSn"
+                }
+            ],
+            "readonlyRootFilesystem": true,
+            "logConfiguration": {
+                "logDriver": "awslogs",
+                "options": {
+                    "awslogs-group": "/devops-g2/payments",
+                    "awslogs-region": "us-east-2",
+                    "awslogs-stream-prefix": "payments"
+                }
+            },
+            "healthCheck": {
+                "command": [
+                    "CMD-SHELL",
+                    "wget -q --spider http://localhost:3001/health || exit 1"
+                ],
+                "interval": 30,
+                "timeout": 5,
+                "retries": 3,
+                "startPeriod": 10
+            },
+            "systemControls": []
+        },
+        {
+            "name": "adot-collector",
+            "image": "public.ecr.aws/aws-observability/aws-otel-collector:v0.43.3",
+            "cpu": 0,
+            "portMappings": [
+                {
+                    "containerPort": 4317,
+                    "hostPort": 4317,
+                    "protocol": "tcp"
+                },
+                {
+                    "containerPort": 4318,
+                    "hostPort": 4318,
+                    "protocol": "tcp"
+                }
+            ],
+            "essential": false,
+            "environment": [
+                {
+                    "name": "AOT_CONFIG_CONTENT",
+                    "value": "# Rendered per service by templatefile(). It used to be a static file shared\n# by every task, which meant POS published its metrics into\n# TillFlow/payments and wrote them to the Payments log group — two\n# services' telemetry silently merged under one name.\nreceivers:\n  otlp:\n    protocols:\n      grpc:\n        endpoint: 0.0.0.0:4317\n      http:\n        endpoint: 0.0.0.0:4318\n\nprocessors:\n  batch:\n    timeout: 5s\n\nexporters:\n  awsxray:\n    region: us-east-2\n  awsemf:\n    region: us-east-2\n    namespace: TillFlow/payments\n    log_group_name: /devops-g2/payments\n    log_stream_name: otel-metrics\n\nextensions:\n  health_check:\n    endpoint: 0.0.0.0:13133\n\nservice:\n  extensions: [health_check]\n  pipelines:\n    traces:\n      receivers: [otlp]\n      processors: [batch]\n      exporters: [awsxray]\n    metrics:\n      receivers: [otlp]\n      processors: [batch]\n      exporters: [awsemf]\n"
+                }
+            ],
+            "mountPoints": [
+                {
+                    "sourceVolume": "tmp",
+                    "containerPath": "/tmp",
+                    "readOnly": false
+                }
+            ],
+            "volumesFrom": [],
+            "readonlyRootFilesystem": true,
+            "logConfiguration": {
+                "logDriver": "awslogs",
+                "options": {
+                    "awslogs-group": "/devops-g2/payments",
+                    "awslogs-region": "us-east-2",
+                    "awslogs-stream-prefix": "adot"
+                }
+            },
+            "healthCheck": {
+                "command": [
+                    "CMD",
+                    "/healthcheck"
+                ],
+                "interval": 10,
+                "timeout": 5,
+                "retries": 3,
+                "startPeriod": 10
+            },
+            "systemControls": []
+        }
+    ],
+    "family": "devops-g2-payments",
+    "taskRoleArn": "arn:aws:iam::240462142849:role/devops-g2-payments-task",
+    "executionRoleArn": "arn:aws:iam::240462142849:role/devops-g2-payments-exec",
+    "networkMode": "awsvpc",
+    "revision": 22,
+    "volumes": [
+        {
+            "name": "tmp",
+            "host": {}
+        }
+    ],
+    "status": "ACTIVE",
+    "requiresAttributes": [
+        {
+            "name": "ecs.capability.execution-role-awslogs"
+        },
+        {
+            "name": "com.amazonaws.ecs.capability.ecr-auth"
+        },
+        {
+            "name": "com.amazonaws.ecs.capability.docker-remote-api.1.17"
+        },
+        {
+            "name": "com.amazonaws.ecs.capability.docker-remote-api.1.21"
+        },
+        {
+            "name": "com.amazonaws.ecs.capability.task-iam-role"
+        },
+        {
+            "name": "ecs.capability.container-health-check"
+        },
+        {
+            "name": "ecs.capability.execution-role-ecr-pull"
+        },
+        {
+            "name": "com.amazonaws.ecs.capability.docker-remote-api.1.18"
+        },
+        {
+            "name": "ecs.capability.task-eni"
+        },
+        {
+            "name": "com.amazonaws.ecs.capability.docker-remote-api.1.29"
+        },
+        {
+            "name": "com.amazonaws.ecs.capability.logging-driver.awslogs"
+        },
+        {
+            "name": "com.amazonaws.ecs.capability.docker-remote-api.1.19"
+        },
+        {
+            "name": "ecs.capability.secrets.asm.environment-variables"
+        }
+    ],
+    "placementConstraints": [],
+    "compatibilities": [
+        "EC2",
+        "FARGATE",
+        "MANAGED_INSTANCES"
+    ],
+    "requiresCompatibilities": [
+        "FARGATE"
+    ],
+    "cpu": "256",
+    "memory": "512",
+    "registeredAt": "2026-09-20T23:41:30.898000+03:00",
+    "registeredBy": "arn:aws:sts::240462142849:assumed-role/devops-g2-ci-deploy/GitHubActions"
+}
