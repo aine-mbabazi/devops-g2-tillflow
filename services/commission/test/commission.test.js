@@ -232,7 +232,7 @@ test('a sale already paid commission on by a previous day\'s close is excluded f
 
 test('reconcilePendingLedgerEntries updates the ledger once Payments resolves a payout', async (t) => {
   const { baseUrl, client, getLastProviderRequestId } = await startPaymentsServer(t);
-  const { baseUrl: posBaseUrl, saleStore } = await startPosServer(t, { paidSales, tenantConfig });
+  const { baseUrl: posBaseUrl } = await startPosServer(t, { paidSales, tenantConfig });
   const paymentsClient = new PaymentsClient({ baseUrl, serviceAuthSecret: TEST_SECRET });
   const posClient = new PosClient({ baseUrl: posBaseUrl, serviceAuthSecret: TEST_SECRET });
   const ledger = new InMemoryCommissionLedger();
