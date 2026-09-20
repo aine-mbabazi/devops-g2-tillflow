@@ -30,14 +30,22 @@ scope here.
 
 ## Routes
 
+Public routes live under `/web/*` — deliberately distinct from POS's `/sales*`
+and Payments' `/payments*`, since all three services share one internal ALB
+and API Gateway (`docs/architecture.md`) and those prefixes are already
+claimed by their own listener rules. web reaches POS and Payments the same
+way POS already reaches Payments: through that same shared ALB, at their own
+un-prefixed paths — `POS_BASE_URL`/`PAYMENTS_BASE_URL` point at the ALB DNS
+name, not at web's own routes.
+
 | Route | Forwards to |
 |-------|-------------|
 | `GET`/`HEAD /health` | liveness only, no dependency |
 | `GET`/`HEAD /ready` | `200` only when both POS and Payments `/health` are reachable |
-| `POST /sales` | `POST /sales` on POS |
-| `GET /sales/:id` | `GET /sales/:id` on POS |
-| `POST /sales/:id/pay` | `POST /sales/:id/pay` on POS |
-| `GET /payments/:id` | `GET /payments/:id` on Payments |
+| `POST /web/sales` | `POST /sales` on POS |
+| `GET /web/sales/:id` | `GET /sales/:id` on POS |
+| `POST /web/sales/:id/pay` | `POST /sales/:id/pay` on POS |
+| `GET /web/payments/:id` | `GET /payments/:id` on Payments |
 
 Every proxied route returns the upstream service's status code and body
 verbatim; a downstream network failure is reported as `502

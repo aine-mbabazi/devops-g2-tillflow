@@ -112,10 +112,10 @@ test('/ready is 200 only when both POS and Payments are reachable', async (t) =>
 test('every proxied route requires a valid service-auth token', async (t) => {
   const { base } = await setup(t);
   const unauthed = await Promise.all([
-    fetch(`${base}/sales`, { method: 'POST', headers: { 'content-type': 'application/json', 'idempotency-key': 'k' }, body: JSON.stringify(validSale) }),
-    fetch(`${base}/sales/sale_x`),
-    fetch(`${base}/sales/sale_x/pay`, { method: 'POST' }),
-    fetch(`${base}/payments/payment_x`),
+    fetch(`${base}/web/sales`, { method: 'POST', headers: { 'content-type': 'application/json', 'idempotency-key': 'k' }, body: JSON.stringify(validSale) }),
+    fetch(`${base}/web/sales/sale_x`),
+    fetch(`${base}/web/sales/sale_x/pay`, { method: 'POST' }),
+    fetch(`${base}/web/payments/payment_x`),
   ]);
   for (const response of unauthed) assert.equal(response.status, 401);
 });
@@ -123,7 +123,7 @@ test('every proxied route requires a valid service-auth token', async (t) => {
 test('proxies a full sale -> pay -> payment status flow to POS and Payments unchanged', async (t) => {
   const { base, entries } = await setup(t);
 
-  const created = await fetch(`${base}/sales`, {
+  const created = await fetch(`${base}/web/sales`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'idempotency-key': 'web-key-001', ...authHeader(validSale.tenant_id) },
     body: JSON.stringify(validSale),
@@ -132,16 +132,16 @@ test('proxies a full sale -> pay -> payment status flow to POS and Payments unch
   const sale = await created.json();
   assert.equal(sale.amount_minor, 10000);
 
-  const fetched = await fetch(`${base}/sales/${sale.sale_id}`, { headers: authHeader(validSale.tenant_id) });
+  const fetched = await fetch(`${base}/web/sales/${sale.sale_id}`, { headers: authHeader(validSale.tenant_id) });
   assert.equal(fetched.status, 200);
   assert.deepEqual(await fetched.json(), sale);
 
-  const paid = await fetch(`${base}/sales/${sale.sale_id}/pay`, { method: 'POST', headers: authHeader(validSale.tenant_id) });
+  const paid = await fetch(`${base}/web/sales/${sale.sale_id}/pay`, { method: 'POST', headers: authHeader(validSale.tenant_id) });
   assert.equal(paid.status, 202);
   const paidSale = await paid.json();
   assert.ok(paidSale.payment_id);
 
-  const payment = await fetch(`${base}/payments/${paidSale.payment_id}`, { headers: authHeader(validSale.tenant_id) });
+  const payment = await fetch(`${base}/web/payments/${paidSale.payment_id}`, { headers: authHeader(validSale.tenant_id) });
   assert.equal(payment.status, 200);
   const paymentBody = await payment.json();
   assert.equal(paymentBody.sale_id, sale.sale_id);
@@ -150,12 +150,12 @@ test('proxies a full sale -> pay -> payment status flow to POS and Payments unch
   // web logs its own request outcomes rather than the proxied body, matching
   // the other services' rule of not logging request/response payloads.
   const httpLogs = entries.filter((entry) => entry.event === 'http_request');
-  assert.ok(httpLogs.some((entry) => entry.route === 'POST /sales' && entry.statusCode === 201));
+  assert.ok(httpLogs.some((entry) => entry.route === 'POST /web/sales' && entry.statusCode === 201));
 });
 
 test('a nonexistent sale proxies through as a 404 from POS, not a web-level error', async (t) => {
   const { base } = await setup(t);
-  const response = await fetch(`${base}/sales/does-not-exist`, { headers: authHeader('tenant_demo_001') });
+  const response = await fetch(`${base}/web/sales/does-not-exist`, { headers: authHeader('tenant_demo_001') });
   assert.equal(response.status, 404);
 });
 

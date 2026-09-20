@@ -26,10 +26,10 @@ function readJsonBody(req) {
 function describeRoute(path, method) {
   if (path === '/health') return '/health';
   if (path === '/ready') return '/ready';
-  if (path === '/sales' && method === 'POST') return 'POST /sales';
-  if (/^\/sales\/[^/]+\/pay$/.test(path)) return 'POST /sales/:id/pay';
-  if (/^\/sales\/[^/]+$/.test(path)) return 'GET /sales/:id';
-  if (/^\/payments\/[^/]+$/.test(path)) return 'GET /payments/:id';
+  if (path === '/web/sales' && method === 'POST') return 'POST /web/sales';
+  if (/^\/web\/sales\/[^/]+\/pay$/.test(path)) return 'POST /web/sales/:id/pay';
+  if (/^\/web\/sales\/[^/]+$/.test(path)) return 'GET /web/sales/:id';
+  if (/^\/web\/payments\/[^/]+$/.test(path)) return 'GET /web/payments/:id';
   return 'unmatched';
 }
 
@@ -83,7 +83,7 @@ export function createApp({ posClient, paymentsClient, serviceAuthSecret, log = 
     const rawAuth = req.headers['x-service-auth'];
     const auth = verifyServiceAuth(rawAuth, serviceAuthSecret);
 
-    if (path === '/sales' && req.method === 'POST') {
+    if (path === '/web/sales' && req.method === 'POST') {
       if (!auth) { statusCode = 401; sendJson(res, statusCode, { error: 'unauthenticated' }); return; }
       let body;
       try { body = await readJsonBody(req); } catch { statusCode = 400; sendJson(res, statusCode, { error: 'invalid_request' }); return; }
@@ -101,7 +101,7 @@ export function createApp({ posClient, paymentsClient, serviceAuthSecret, log = 
       return;
     }
 
-    const payMatch = /^\/sales\/([^/]+)\/pay$/.exec(path);
+    const payMatch = /^\/web\/sales\/([^/]+)\/pay$/.exec(path);
     if (payMatch && req.method === 'POST') {
       if (!auth) { statusCode = 401; sendJson(res, statusCode, { error: 'unauthenticated' }); return; }
       try {
@@ -114,7 +114,7 @@ export function createApp({ posClient, paymentsClient, serviceAuthSecret, log = 
       return;
     }
 
-    const saleMatch = /^\/sales\/([^/]+)$/.exec(path);
+    const saleMatch = /^\/web\/sales\/([^/]+)$/.exec(path);
     if (saleMatch && req.method === 'GET') {
       if (!auth) { statusCode = 401; sendJson(res, statusCode, { error: 'unauthenticated' }); return; }
       try {
@@ -127,7 +127,7 @@ export function createApp({ posClient, paymentsClient, serviceAuthSecret, log = 
       return;
     }
 
-    const paymentMatch = /^\/payments\/([^/]+)$/.exec(path);
+    const paymentMatch = /^\/web\/payments\/([^/]+)$/.exec(path);
     if (paymentMatch && req.method === 'GET') {
       if (!auth) { statusCode = 401; sendJson(res, statusCode, { error: 'unauthenticated' }); return; }
       try {
@@ -140,7 +140,7 @@ export function createApp({ posClient, paymentsClient, serviceAuthSecret, log = 
       return;
     }
 
-    if (path === '/sales') { statusCode = 405; sendJson(res, statusCode, { error: 'method_not_allowed' }, { Allow: 'POST' }); return; }
+    if (path === '/web/sales') { statusCode = 405; sendJson(res, statusCode, { error: 'method_not_allowed' }, { Allow: 'POST' }); return; }
     statusCode = 404; sendJson(res, statusCode, { error: 'not_found' });
   });
 }
