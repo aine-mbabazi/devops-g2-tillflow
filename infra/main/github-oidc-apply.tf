@@ -192,6 +192,14 @@ data "aws_iam_policy_document" "github_apply_permissions" {
       "iam:DeleteRole",
       "iam:GetRole",
       "iam:UpdateRole",
+      # iam:UpdateRole covers description/max-session-duration only — a
+      # distinct action, iam:UpdateAssumeRolePolicy, is required to change a
+      # role's trust policy. First surfaced 2026-09-20 when adding
+      # release-web.yml to github_actions_deploy's job_workflow_ref allow-list
+      # failed apply: every prior GroupScopedIAM change had only ever touched
+      # an inline policy or a brand-new role, never an existing role's trust
+      # relationship.
+      "iam:UpdateAssumeRolePolicy",
       "iam:PassRole",
       "iam:TagRole",
       "iam:UntagRole",

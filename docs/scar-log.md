@@ -102,3 +102,32 @@ rather than pretending the automated path alone closes the loop.
 Drills 3 (platform failure), 4 (broken release) and 5 (restore) still need
 the live AWS stack — desired_count=1 ECS service, RDS snapshot, a real
 deploy to break — and have not been run yet.
+
+## 2026-09-20 — Infra Apply partially failed deploying web: missing iam:UpdateAssumeRolePolicy
+
+Deploying `services/web` as a real ECS service required adding
+`release-web.yml` to `github_actions_deploy`'s OIDC trust policy
+(`job_workflow_ref` allow-list) alongside the other release workflows. The
+apply got through every new web resource (ECR repo, IAM roles, task
+definition, ALB target group/listener rule, ECS service all created
+successfully) and then failed on that one trust-policy update:
+`AccessDenied: iam:UpdateAssumeRolePolicy`. `release-web.yml` then failed
+its own OIDC step immediately after, since the role it needed to assume
+still didn't trust it.
+
+Root cause: `GroupScopedIAM`'s existing `iam:UpdateRole` only covers a
+role's description and max-session-duration — changing its *trust policy*
+(who may assume it) is a distinct action, `iam:UpdateAssumeRolePolicy`,
+that the apply role had never needed until this PR, because every prior
+`GroupScopedIAM` change had only ever touched an inline policy or created a
+brand-new role, never edited an existing role's trust relationship.
+
+Fixed by adding `iam:UpdateAssumeRolePolicy` to `GroupScopedIAM`, scoped to
+the same `role/devops-g2-*` resource prefix as everything else in that
+statement.
+
+Lesson: same shape as the S3 `ListBucket`/`GetBucketPolicy` gaps from
+earlier this week — a role that has only ever needed a subset of an AWS
+service's actions surfaces a new, narrowly specific gap exactly when a
+genuinely new *kind* of change (not just a new resource) is introduced, one
+action at a time.
