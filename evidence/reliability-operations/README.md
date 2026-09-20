@@ -359,3 +359,8 @@ reflect genuine operational behavior rather than a smoothed-over demo:
   which means a secret rotation is not picked up until the next cold start.
   This was observed directly: updating the secret alone did not fix delivery
   until the function's execution environments were recycled.
+
+**Recovery also confirmed**, same path, at 2026-09-20T19:12:01Z:
+`{"event":"alert_delivered","alarm":"test-manual-trigger","state":"OK"}`.
+Both the firing and recovery notifications from a single alarm's lifecycle
+were delivered to Slack in this session.

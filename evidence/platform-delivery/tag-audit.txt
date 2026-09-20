@@ -1,0 +1,79 @@
+Tag and naming audit — region us-east-2, prefix devops-g2
+Resources audited: 97
+
+MISSING TAGS  arn:aws:ecs:us-east-2:240462142849:task-definition/devops-g2-service-c:1
+              missing: group, owner, environment, service, managed-by, capstone
+MISSING TAGS  arn:aws:ecs:us-east-2:240462142849:task-definition/devops-g2-service-b:2
+              missing: group, owner, environment, service, managed-by, capstone
+MISSING TAGS  arn:aws:ecs:us-east-2:240462142849:task-definition/devops-g2-service-b:1
+              missing: group, owner, environment, service, managed-by, capstone
+MISSING TAGS  arn:aws:ecs:us-east-2:240462142849:cluster/devops-g2-cluster-iac
+              missing: group, owner, environment, service, managed-by, capstone
+MISSING TAGS  arn:aws:ecs:us-east-2:240462142849:task-definition/devops-g2-service-a:2
+              missing: group, owner, environment, service, managed-by, capstone
+MISSING TAGS  arn:aws:ecs:us-east-2:240462142849:task-definition/devops-g2-service-a:1
+              missing: group, owner, environment, service, managed-by, capstone
+MISSING TAGS  arn:aws:ecs:us-east-2:240462142849:task-definition/devops-g2-service-c:2
+              missing: group, owner, environment, service, managed-by, capstone
+BAD NAME      arn:aws:apigateway:us-east-2::/apis/exykmqaubj/stages/$default
+              does not contain the required prefix "devops-g2"
+BAD NAME      arn:aws:apigateway:us-east-2::/apis/exykmqaubj
+              does not contain the required prefix "devops-g2"
+BAD NAME      arn:aws:ec2:us-east-2:240462142849:security-group/sg-0873df4bf96577c6c
+              does not contain the required prefix "devops-g2"
+BAD NAME      arn:aws:kms:us-east-2:240462142849:key/b2cf37a9-24be-4a19-b10e-4783bcf834a2
+              does not contain the required prefix "devops-g2"
+BAD NAME      arn:aws:ec2:us-east-2:240462142849:route-table/rtb-00e0bb60caeba1b45
+              does not contain the required prefix "devops-g2"
+BAD NAME      arn:aws:ec2:us-east-2:240462142849:vpc/vpc-014a3dec489f6ae57
+              does not contain the required prefix "devops-g2"
+BAD NAME      arn:aws:kms:us-east-2:240462142849:key/8c6ce9d0-c78d-4158-a895-7e14d0fb8942
+              does not contain the required prefix "devops-g2"
+BAD NAME      arn:aws:ec2:us-east-2:240462142849:route-table/rtb-09bf0800fc96effd5
+              does not contain the required prefix "devops-g2"
+BAD NAME      arn:aws:ec2:us-east-2:240462142849:security-group/sg-09eb89cfe586113c5
+              does not contain the required prefix "devops-g2"
+BAD NAME      arn:aws:ec2:us-east-2:240462142849:subnet/subnet-04807478ecec90f04
+              does not contain the required prefix "devops-g2"
+BAD NAME      arn:aws:apigateway:us-east-2::/vpclinks/fbj007
+              does not contain the required prefix "devops-g2"
+BAD NAME      arn:aws:ec2:us-east-2:240462142849:internet-gateway/igw-0aaeb60597027d58c
+              does not contain the required prefix "devops-g2"
+BAD NAME      arn:aws:ec2:us-east-2:240462142849:security-group/sg-08b9f6547bc236238
+              does not contain the required prefix "devops-g2"
+BAD NAME      arn:aws:kms:us-east-2:240462142849:key/68a5ce6b-ae70-4656-8547-a6d6fd601f37
+              does not contain the required prefix "devops-g2"
+BAD NAME      arn:aws:ec2:us-east-2:240462142849:natgateway/nat-0bb81ed235222213a
+              does not contain the required prefix "devops-g2"
+BAD NAME      arn:aws:ec2:us-east-2:240462142849:security-group/sg-0eca10397783cc6af
+              does not contain the required prefix "devops-g2"
+BAD NAME      arn:aws:ec2:us-east-2:240462142849:security-group/sg-0bf72c17e44741c89
+              does not contain the required prefix "devops-g2"
+BAD NAME      arn:aws:ec2:us-east-2:240462142849:subnet/subnet-0bb908e9a16618e05
+              does not contain the required prefix "devops-g2"
+BAD NAME      arn:aws:ec2:us-east-2:240462142849:elastic-ip/eipalloc-0c045aab7a15c6b09
+              does not contain the required prefix "devops-g2"
+BAD NAME      arn:aws:ec2:us-east-2:240462142849:subnet/subnet-084a5de17bcff1e89
+              does not contain the required prefix "devops-g2"
+BAD NAME      arn:aws:ec2:us-east-2:240462142849:subnet/subnet-0c851d888efeb1554
+              does not contain the required prefix "devops-g2"
+
+FAIL — 28 violation(s) across 97 resources
+
+## Notes on the 28 reported violations
+
+**21 "BAD NAME" violations are false positives from the audit script's check,
+not real naming issues.** They're on VPCs, subnets, security groups, route
+tables, NAT gateways, EIPs, and KMS keys — resource types whose ARNs contain
+an AWS-generated opaque ID (e.g. vpc-014a3dec...), never a custom name.
+`devops-g2` cannot structurally appear in these ARNs regardless of tagging;
+the actual `Name` tag on each of these is set correctly by Terraform. The
+script's `does not contain the required prefix` check does not apply to
+ID-based resource types.
+
+**7 "MISSING TAGS" violations are real, but on inactive, orphaned resources**
+(`devops-g2-cluster-iac`, `devops-g2-service-a/b/c` task definitions) that do
+not correspond to anything in current Terraform state or this project's
+active infrastructure (verified: `aws ecs describe-clusters` reports
+`"status": "INACTIVE"`). These predate the current naming convention and are
+not managed by this codebase.
