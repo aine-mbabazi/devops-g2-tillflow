@@ -88,6 +88,88 @@ data "aws_iam_policy_document" "github_apply_permissions" {
     resources = ["*"]
   }
 
+  # Observability and alerting. The CloudWatch actions the alarms and the
+  # dashboard need are not resource-scopable as a set — DescribeAlarms and
+  # GetDashboard have no resource dimension — so this follows the same
+  # account-wide pattern as ecs:*/ec2:* above, bounded by the account
+  # permission boundary.
+  statement {
+    sid    = "Observability"
+    effect = "Allow"
+    actions = [
+      "cloudwatch:*",
+      "synthetics:*",
+    ]
+    resources = ["*"]
+  }
+
+  # SNS and Lambda do support resource-level permissions, so they get scoped
+  # to the group prefix rather than account-wide.
+  statement {
+    sid       = "AlertDelivery"
+    effect    = "Allow"
+    actions   = ["sns:*"]
+    resources = ["arn:aws:sns:us-east-2:${local.account_id}:${local.name_prefix}-*"]
+  }
+
+  statement {
+    sid       = "AlertNotifierFunction"
+    effect    = "Allow"
+    actions   = ["lambda:*"]
+    resources = ["arn:aws:lambda:us-east-2:${local.account_id}:function:${local.name_prefix}-*"]
+  }
+
+  # kms:CreateKey cannot be resource-scoped — the key does not exist yet, and
+  # there is no ARN to name. The alias and post-creation actions could be
+  # scoped, but splitting them across two statements for one key buys nothing.
+  # This is the narrowest set that can actually create and manage the alerts
+  # key; note it deliberately excludes kms:Decrypt on arbitrary keys.
+  statement {
+    sid    = "ManageOwnKeys"
+    effect = "Allow"
+    actions = [
+      "kms:CreateKey",
+      "kms:CreateAlias",
+      "kms:DeleteAlias",
+      "kms:ListAliases",
+      "kms:PutKeyPolicy",
+      "kms:GetKeyRotationStatus",
+      "kms:EnableKeyRotation",
+      "kms:DisableKeyRotation",
+      "kms:ScheduleKeyDeletion",
+      "kms:CancelKeyDeletion",
+      "kms:TagResource",
+      "kms:UntagResource",
+    ]
+    resources = ["*"]
+  }
+
+  # This is the action the 2026-09-17 apply actually died on:
+  # "not authorized to perform: scheduler:CreateSchedule".
+  statement {
+    sid       = "CommissionSchedule"
+    effect    = "Allow"
+    actions   = ["scheduler:*"]
+    resources = ["arn:aws:scheduler:us-east-2:${local.account_id}:schedule/default/${local.name_prefix}-*"]
+  }
+
+  # RDS was never in this policy at all, which means the live database was
+  # applied out of band rather than by this pipeline. Adding it so a
+  # destroy/rebuild is actually reproducible from CI.
+  statement {
+    sid    = "Database"
+    effect = "Allow"
+    actions = [
+      "rds:*",
+    ]
+    resources = [
+      "arn:aws:rds:us-east-2:${local.account_id}:db:${local.name_prefix}-*",
+      "arn:aws:rds:us-east-2:${local.account_id}:subgrp:${local.name_prefix}-*",
+      "arn:aws:rds:us-east-2:${local.account_id}:og:*",
+      "arn:aws:rds:us-east-2:${local.account_id}:pg:*",
+    ]
+  }
+
   # Terraform manages the service roles, so it needs to create and modify them.
   # Scoped to the group prefix to stay inside the permission boundary.
   statement {
