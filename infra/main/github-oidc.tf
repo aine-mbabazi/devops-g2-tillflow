@@ -120,6 +120,10 @@ data "aws_iam_policy_document" "github_actions_permissions" {
       # Needed once these resources exist in state: every subsequent plan
       # refreshes them, and a plan that cannot read a managed resource fails
       # before it can report drift.
+      # s3:ListBucket authorizes HeadBucket, which the provider calls for
+      # every aws_s3_bucket read/import — s3:GetBucket* alone 403s it, and
+      # the provider misreports that 403 as "bucket does not exist".
+      "s3:ListBucket",
       "cloudwatch:Describe*",
       "cloudwatch:GetDashboard",
       "cloudwatch:ListDashboards",

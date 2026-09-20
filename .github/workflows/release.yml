@@ -130,14 +130,30 @@ jobs:
           [ "$ROLLOUT" = "COMPLETED" ] || { echo "::error::rollout did not complete"; exit 1; }
 
           echo "--- every target is healthy"
+          # ECS reporting the rollout COMPLETED does not mean the ALB target
+          # group has caught up: healthy_threshold=2 x interval=30s means a
+          # freshly-registered target can take up to ~60s to flip healthy.
+          # A single point-in-time check here raced that window and flapped
+          # the pipeline into an unnecessary rollback. Poll instead.
           TG="$(aws elbv2 describe-target-groups \
             --names devops-g2-payments-tg --region us-east-2 \
             --query 'TargetGroups[0].TargetGroupArn' --output text)"
-          UNHEALTHY="$(aws elbv2 describe-target-health \
-            --target-group-arn "$TG" --region us-east-2 \
-            --query 'length(TargetHealthDescriptions[?TargetHealth.State!=`healthy`])' --output text)"
-          echo "unhealthy targets=$UNHEALTHY"
-          [ "$UNHEALTHY" = "0" ] || { echo "::error::$UNHEALTHY target(s) not healthy"; exit 1; }
+          ATTEMPTS=12
+          SLEEP_SECONDS=10
+          UNHEALTHY=""
+          for i in $(seq 1 "$ATTEMPTS"); do
+            UNHEALTHY="$(aws elbv2 describe-target-health \
+              --target-group-arn "$TG" --region us-east-2 \
+              --query 'length(TargetHealthDescriptions[?TargetHealth.State!=`healthy`])' --output text)"
+            echo "attempt $i/$ATTEMPTS: unhealthy targets=$UNHEALTHY"
+            [ "$UNHEALTHY" = "0" ] && break
+            sleep "$SLEEP_SECONDS"
+          done
+          [ "$UNHEALTHY" = "0" ] || {
+            echo "::error::$UNHEALTHY target(s) still not healthy after $((ATTEMPTS * SLEEP_SECONDS))s"
+            aws elbv2 describe-target-health --target-group-arn "$TG" --region us-east-2
+            exit 1
+          }
 
           # The check that actually ties runtime to the pipeline: the running
           # task must be the exact digest this workflow pushed. A green
