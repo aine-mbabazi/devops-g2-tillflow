@@ -149,8 +149,14 @@ jobs:
           (cd services/pos && SERVICE_AUTH_SECRET=$SERVICE_AUTH_SECRET \
             PAYMENTS_BASE_URL=http://127.0.0.1:3001 POS_STORE=memory \
             HOST=127.0.0.1 PORT=3002 node src/server.js &)
+          # /ready, not /health: this loop wants to know the process is up and
+          # its dependencies are reachable before k6 hits it, same distinction
+          # services/pos/src/app.js draws between liveness and readiness.
+          # /health is deliberately allowed to fail independently of that (see
+          # game day drill 4), so gating startup on it would fail this job for
+          # a reason that has nothing to do with whether k6 can actually run.
           for i in $(seq 1 30); do
-            if curl -sf http://127.0.0.1:3002/health > /dev/null \
+            if curl -sf http://127.0.0.1:3002/ready > /dev/null \
                && curl -sf http://127.0.0.1:3001/health > /dev/null; then
               echo "both services up"; exit 0
             fi
