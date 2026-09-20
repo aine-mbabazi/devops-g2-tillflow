@@ -13,6 +13,7 @@ idempotency, reconciliation and replay, per [`docs/ownership.md`](../../docs/own
 | [#16](https://github.com/aine-mbabazi/devops-g2-tillflow/pull/16) | Daraja sandbox STK Push client |
 | [#28](https://github.com/aine-mbabazi/devops-g2-tillflow/pull/28) | STK callbacks + reconciliation; B2C payouts; Commission worker |
 | (this branch) | Service-to-service auth (`services/_shared/service-auth.js`) enforced on all tenant-scoped Payments and POS routes; POS service (sale creation, tenant/attendant config, pay, reconcile) — POS is normally Product + POS's area, built here as a one-off because @aine-mbabazi was unavailable ahead of the G2 deadline; Commission wired to read real confirmed-paid sales and tenant config from POS instead of taking synthetic data as parameters |
+| (this branch, reconciliation consumer) | Wires the `devops-g2-reconciliation` queue + DLQ (provisioned in PR #48, left unconsumed — see "Known gaps" there) with a producer and consumer in `services/payments`: `provider_dispatch_unconfirmed` now enqueues `{type, id}` for the payment or payout it just failed to confirm, and a long-polling consumer (`src/reconciliation-queue.js`) re-queries Daraja and transitions the record, following the same reconciliation order as callbacks (`docs/runbook.md#reconciliation-order`) |
 
 ## Decisions
 
@@ -144,6 +145,23 @@ An external review of this branch found several real issues, addressed as follow
   Payments resolves a payout."
 - **PR CI only ran Payments' tests.** `pr.yml` had no job for `services/pos`
   or `services/commission`. Added `pos-tests` and `commission-tests` jobs.
+
+## Reconciliation queue behavior
+
+An enqueued message is resolved in one of four ways, mirroring the callback
+handlers rather than inventing new semantics:
+
+| Record state when picked up | Action |
+|---|---|
+| Already terminal (or gone) | No-op, message deleted — at-least-once delivery means this may be a duplicate of one already handled |
+| Pending, has a provider request ID, Daraja returns terminal | Transitioned, message deleted, `reconciled` logged |
+| Pending, has a provider request ID, Daraja still says pending | Left on the queue for redelivery — never inferred as an outcome |
+| Pending, **no** provider request ID (the dispatch call itself never got one back) | Left on the queue; after five receives it lands in the DLQ for a human, per `docs/runbook.md#reconciliation-dlq` — there is nothing to query yet, and inventing one would guess at a state nobody can confirm |
+
+Proof: `cd services/payments && npm test` includes `test/reconciliation-queue.test.js`
+(11 cases against a fake SQS client, mirroring how `FakeDarajaClient` avoids
+real network calls) and a `payments.test.js` case asserting `app.js` actually
+calls `enqueue` on both dispatch-failure sites.
 
 ## Known gaps (still not covered)
 

@@ -6,6 +6,8 @@ import { InMemoryPaymentStore } from './payment-store.js';
 import { PostgresPaymentStore } from './postgres-payment-store.js';
 import { InMemoryPayoutStore } from './payout-store.js';
 import { PostgresPayoutStore } from './postgres-payout-store.js';
+import { createReconciliationQueue } from './reconciliation-queue.js';
+import { createSqsQueueClient } from './sqs-client.js';
 import { shutdownTelemetry, traceContext } from './telemetry.js';
 
 const log = (entry) => console.log(JSON.stringify({
@@ -37,7 +39,17 @@ async function start() {
   const darajaClient = config.darajaMode === 'sandbox'
     ? new DarajaSandboxClient(config.sandbox)
     : new FakeDarajaClient();
-  const server = createApp({ darajaClient, serviceAuthSecret: config.serviceAuthSecret, paymentStore, payoutStore, log });
+  let reconciliationQueue;
+  let reconciliationController;
+  if (config.reconciliationQueueUrl) {
+    const queueClient = createSqsQueueClient({ region: config.awsRegion });
+    reconciliationQueue = createReconciliationQueue({ queueClient, queueUrl: config.reconciliationQueueUrl, log });
+    reconciliationController = new AbortController();
+    reconciliationQueue
+      .run({ paymentStore, payoutStore, darajaClient, signal: reconciliationController.signal })
+      .catch((error) => log({ event: 'reconciliation_consumer_crashed', message: error.message }));
+  }
+  const server = createApp({ darajaClient, serviceAuthSecret: config.serviceAuthSecret, paymentStore, payoutStore, log, reconciliationQueue });
   server.on('error', (error) => {
     log({ event: 'server_error', code: error.code ?? 'UNKNOWN' });
     process.exitCode = 1;
@@ -53,6 +65,7 @@ async function start() {
     if (stopping) return;
     stopping = true;
     log({ event: 'shutdown' });
+    reconciliationController?.abort();
     const deadline = setTimeout(() => {
       server.closeAllConnections();
       process.exit(1);

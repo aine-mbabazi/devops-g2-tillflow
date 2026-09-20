@@ -52,5 +52,12 @@ export function loadConfig(env = process.env) {
       if (url.protocol !== 'https:') throw new Error(`${name} must use HTTPS`);
     }
   }
-  return Object.freeze({ host, port: Number(rawPort), darajaMode, paymentStore, databaseUrl, serviceAuthSecret, sandbox });
+  // Optional: absent in local/dev and in tests, where there is no queue to
+  // talk to. The reconciliation consumer simply does not start without it.
+  const reconciliationQueueUrl = env.RECONCILIATION_QUEUE_URL;
+  const awsRegion = env.AWS_REGION;
+  return Object.freeze({
+    host, port: Number(rawPort), darajaMode, paymentStore, databaseUrl, serviceAuthSecret, sandbox,
+    reconciliationQueueUrl, awsRegion,
+  });
 }
