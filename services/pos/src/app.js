@@ -143,9 +143,12 @@ export function createApp({ paymentsClient, serviceAuthSecret, saleStore = new I
 
     if (path === '/health') {
       if (req.method === 'GET' || req.method === 'HEAD') {
-        statusCode = 200;
+        // Game day drill 4 (docs/runbook.md#game-day-drills): deliberately
+        // broken so post-deploy smoke and rollback can be observed against
+        // the live stack. Revert this hunk once the drill is recorded.
+        statusCode = 500;
         res.writeHead(statusCode, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
-        res.end(req.method === 'HEAD' ? undefined : JSON.stringify({ service: 'pos', status: 'ok' }));
+        res.end(req.method === 'HEAD' ? undefined : JSON.stringify({ service: 'pos', status: 'drill' }));
       } else { statusCode = 405; sendJson(res, statusCode, { error: 'method_not_allowed' }, { Allow: 'GET, HEAD' }); }
       return;
     }
