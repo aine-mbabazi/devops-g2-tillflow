@@ -158,3 +158,28 @@ Terraform-managed policy underneath it really is, and the gap only surfaces
 at the worst possible time: the moment something finally removes the
 crutch. Worth an explicit periodic check for drift like this rather than
 waiting to discover it this way again.
+
+## 2026-09-21 — Manual `put-role-policy` patch to unblock a PR predates its own fix landing on `main`
+
+While PR #66 (which already carried the fix above, commit `930eeca`, on its
+own branch) was open, `devops-g2-ci-deploy`'s `TerraformReadForPlan`
+statement on `main` still lacked the same three S3 actions — that commit
+hadn't merged yet. A blocked PR's `terraform plan` hit the identical
+`AccessDenied: s3:GetAccelerateConfiguration` failure, and aine-mbabazi
+patched the live role directly via `aws iam put-role-policy` from
+CloudShell to unblock it, instead of waiting for #66 to merge.
+
+The patch happened to add exactly the three actions `930eeca` already
+codified, so it didn't conflict with that branch. But `aws_iam_role_policy`
+replaces the entire inline document on every apply, and nothing on `main`
+asked for these actions yet — the next `infra-apply.yml` run sourced from
+`main` (unrelated to #66) would silently overwrite the live document back
+to the old, narrower one, and re-fail the next PR's plan the same way,
+looking like a fresh regression instead of a known, already-fixed gap.
+
+Lesson: a manual live patch that matches an *unmerged* branch's Terraform
+code is not a fix, it's a countdown — it survives only until the next
+unrelated `apply` from `main` reasserts the old document. Merge and apply
+the branch that already has the change instead of patching the live
+resource by hand, even when the patch is byte-for-byte what the pending
+code would produce.
