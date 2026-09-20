@@ -102,3 +102,84 @@ rather than pretending the automated path alone closes the loop.
 Drills 3 (platform failure), 4 (broken release) and 5 (restore) still need
 the live AWS stack — desired_count=1 ECS service, RDS snapshot, a real
 deploy to break — and have not been run yet.
+
+## 2026-09-20 — Infra Apply partially failed deploying web: missing iam:UpdateAssumeRolePolicy
+
+Deploying `services/web` as a real ECS service required adding
+`release-web.yml` to `github_actions_deploy`'s OIDC trust policy
+(`job_workflow_ref` allow-list) alongside the other release workflows. The
+apply got through every new web resource (ECR repo, IAM roles, task
+definition, ALB target group/listener rule, ECS service all created
+successfully) and then failed on that one trust-policy update:
+`AccessDenied: iam:UpdateAssumeRolePolicy`. `release-web.yml` then failed
+its own OIDC step immediately after, since the role it needed to assume
+still didn't trust it.
+
+Root cause: `GroupScopedIAM`'s existing `iam:UpdateRole` only covers a
+role's description and max-session-duration — changing its *trust policy*
+(who may assume it) is a distinct action, `iam:UpdateAssumeRolePolicy`,
+that the apply role had never needed until this PR, because every prior
+`GroupScopedIAM` change had only ever touched an inline policy or created a
+brand-new role, never edited an existing role's trust relationship.
+
+Fixed by adding `iam:UpdateAssumeRolePolicy` to `GroupScopedIAM`, scoped to
+the same `role/devops-g2-*` resource prefix as everything else in that
+statement.
+
+Lesson: same shape as the S3 `ListBucket`/`GetBucketPolicy` gaps from
+earlier this week — a role that has only ever needed a subset of an AWS
+service's actions surfaces a new, narrowly specific gap exactly when a
+genuinely new *kind* of change (not just a new resource) is introduced, one
+action at a time.
+
+## 2026-09-20 — Destroying untracked drift exposed a second, larger read gap
+
+The same apply above also destroyed `aws_iam_role_policy_attachment
+.github_actions_readonly` — a `ReadOnlyAccess` managed-policy attachment on
+`devops-g2-ci-deploy` that existed in AWS but was never written into
+`github-oidc.tf`. Untracked drift, and Terraform correctly reconciled it
+away since nothing in configuration asked for it.
+
+The very next PR's `terraform plan` (same `ci-deploy` role, used by both
+`pr.yml` and `infra-apply.yml`'s Plan job) then failed refreshing the S3
+buckets: `AccessDenied: s3:GetAccelerateConfiguration`. `ReadOnlyAccess` had
+been silently backstopping every read this role's own itemized
+`TerraformReadForPlan` list never actually covered. With it gone, the
+role's *real* permission set is exposed for the first time — and it was
+short three S3 read actions that don't follow the `GetBucket*` naming
+pattern the existing wildcard matches: `GetAccelerateConfiguration`,
+`GetObjectLockConfiguration`, `GetReplicationConfiguration`.
+
+Fixed by adding those three explicitly.
+
+Lesson: an untracked, broad, manually-attached policy does not just violate
+least-privilege on paper — it actively hides how incomplete the
+Terraform-managed policy underneath it really is, and the gap only surfaces
+at the worst possible time: the moment something finally removes the
+crutch. Worth an explicit periodic check for drift like this rather than
+waiting to discover it this way again.
+
+## 2026-09-21 — Manual `put-role-policy` patch to unblock a PR predates its own fix landing on `main`
+
+While PR #66 (which already carried the fix above, commit `930eeca`, on its
+own branch) was open, `devops-g2-ci-deploy`'s `TerraformReadForPlan`
+statement on `main` still lacked the same three S3 actions — that commit
+hadn't merged yet. A blocked PR's `terraform plan` hit the identical
+`AccessDenied: s3:GetAccelerateConfiguration` failure, and aine-mbabazi
+patched the live role directly via `aws iam put-role-policy` from
+CloudShell to unblock it, instead of waiting for #66 to merge.
+
+The patch happened to add exactly the three actions `930eeca` already
+codified, so it didn't conflict with that branch. But `aws_iam_role_policy`
+replaces the entire inline document on every apply, and nothing on `main`
+asked for these actions yet — the next `infra-apply.yml` run sourced from
+`main` (unrelated to #66) would silently overwrite the live document back
+to the old, narrower one, and re-fail the next PR's plan the same way,
+looking like a fresh regression instead of a known, already-fixed gap.
+
+Lesson: a manual live patch that matches an *unmerged* branch's Terraform
+code is not a fix, it's a countdown — it survives only until the next
+unrelated `apply` from `main` reasserts the old document. Merge and apply
+the branch that already has the change instead of patching the live
+resource by hand, even when the patch is byte-for-byte what the pending
+code would produce.

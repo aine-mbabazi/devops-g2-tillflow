@@ -178,6 +178,15 @@ data "aws_iam_policy_document" "github_actions_permissions" {
       "s3:GetBucket*",
       "s3:GetEncryptionConfiguration",
       "s3:GetLifecycleConfiguration",
+      # Not covered by the s3:GetBucket* wildcard above — S3's own IAM action
+      # naming is inconsistent, and these three break the "GetBucket..."
+      # pattern. Surfaced only once this PR's apply removed a pre-existing,
+      # untracked ReadOnlyAccess attachment on this role (see scar-log) that
+      # had been silently backstopping reads this role's own itemized
+      # permissions never actually covered.
+      "s3:GetAccelerateConfiguration",
+      "s3:GetObjectLockConfiguration",
+      "s3:GetReplicationConfiguration",
     ]
     resources = ["*"]
   }
