@@ -233,6 +233,7 @@ data "aws_iam_policy_document" "github_apply_permissions" {
       "s3:DeleteBucket",
       "s3:ListBucket",
       "s3:GetBucketLocation",
+      "s3:GetBucketPolicy",
       "s3:GetBucketTagging",
       "s3:PutBucketTagging",
       "s3:GetBucketVersioning",
