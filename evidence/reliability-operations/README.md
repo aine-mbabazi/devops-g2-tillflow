@@ -306,12 +306,19 @@ the G4 "broken release" drill, which has not been run.
 Stated plainly, because the assessment rule rewards reproducibility over
 explanation and these are the places where neither yet exists.
 
-- **Game day: 2 of 5 drills run.** Drills 1 (uncertain payment) and 2
-  (callback replay) are executed and passing — see "Game day — drills 1 & 2
-  confirmed" below. Drills 3 (platform failure), 4 (broken release) and 5
-  (restore) still need real AWS infra to exercise (stopping a live task,
-  deploying a broken image, restoring an RDS snapshot) and have not been run.
-  That is the remaining gap blocking G4.
+- **Drill 3 (platform failure) was executed.** The Payments task was
+  stopped and ECS launched a replacement that returned healthy/running. The
+  run lasted from 2026-09-20T21:48:30Z to 2026-09-20T21:55:53Z, for a measured
+  recovery time of 7m 23s. The required platform-failure alarm firing and
+  corresponding Slack alert were not captured, so this is execution evidence,
+  not a full Drill 3 pass.
+- **Drill 4 (broken release) remains unproven.** The runbook requires a
+  deliberately broken image, post-deploy smoke failure, rollback, and a timed
+  recovery under 30 minutes.
+- **Drill 5 (restore) was executed but is not a full pass.** An RDS
+  point-in-time restore completed in 35m 21s, exceeding the stated 30-minute
+  RTO target. The required post-restore provider-reference reconciliation was
+  not captured, so Drill 5 cannot be recorded as passing.
 - **RTO and RPO are asserted, not measured.** The 30-minute and 5-minute figures
   are design intent derived from how the mechanisms work. Only the restore drill
   converts them into evidence.
