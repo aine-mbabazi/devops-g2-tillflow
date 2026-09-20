@@ -55,7 +55,7 @@ jobs:
       - name: Upload plan
         uses: actions/upload-artifact@v4
         with:
-          name: tfplan-${{ github.sha }}
+          name: tfplan-${{ github.run_id }}
           path: infra/main/tfplan
           retention-days: 5
           if-no-files-found: error
@@ -63,7 +63,7 @@ jobs:
       - name: Upload lambda package
         uses: actions/upload-artifact@v4
         with:
-          name: slack-notifier-zip-${{ github.sha }}
+          name: slack-notifier-zip-${{ github.run_id }}
           path: infra/main/.build/slack-notifier.zip
           retention-days: 5
           if-no-files-found: error
@@ -101,13 +101,13 @@ jobs:
       - name: Download plan
         uses: actions/download-artifact@v4
         with:
-          name: tfplan-${{ github.sha }}
+          name: tfplan-${{ github.run_id }}
           path: infra/main
 
       - name: Download lambda package
         uses: actions/download-artifact@v4
         with:
-          name: slack-notifier-zip-${{ github.sha }}
+          name: slack-notifier-zip-${{ github.run_id }}
           path: infra/main/.build
 
       # Applying the saved plan file, not a freshly computed one: what a
