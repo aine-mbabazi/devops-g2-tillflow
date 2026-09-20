@@ -63,7 +63,7 @@ competence.
 Run it, do not describe it:
 
 ```bash
-cd services/pos && npm test    # 14/14
+cd services/pos && npm test    # 22/22
 ```
 
 Name the specific test: *"the full sale → STK → callback → reconcile → paid

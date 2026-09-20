@@ -202,9 +202,21 @@ Costs stop when the stack is destroyed — see [Destroy](#destroy-cost-control--
 
 ## Cleanup status
 
-**Currently provisioned** (as of last update): VPC, ALB, NAT Gateway, ECS
-cluster + Payments service, ECR repo, CloudWatch logs, IAM roles, OIDC
-CI/CD role. Bootstrap state backend (S3 + DynamoDB) also provisioned.
+**Currently provisioned** (as of last update, per
+[`evidence/platform-delivery/README.md`](evidence/platform-delivery/README.md)):
+VPC, ALB, NAT Gateway, RDS PostgreSQL (single-AZ `db.t4g.micro`), an ECS
+cluster running the Payments and POS services plus the Commission scheduled
+worker, three ECR repositories (`pos`, `payments`, `commission`), five S3
+buckets (`artifacts`, `logs`, `backups`, `evidence`, `tillflow-tfstate`),
+CloudWatch logs, IAM roles, OIDC CI/CD roles. Bootstrap state backend (S3 +
+DynamoDB) also provisioned.
+
+**Not confirmed live:** ElastiCache (Valkey) and the SQS reconciliation
+queue/DLQ exist in `infra/main/` but `evidence/platform-delivery/README.md`'s
+"Known gaps" section states no `terraform apply` had run for them from that
+branch; API Gateway + VPC Link is tracked separately on PR #46 and that same
+doc calls it not yet provisioned. Verify current apply state before relying
+on this.
 
 Update this section before/after each gate to reflect whether infra is
 live or torn down, since the NAT Gateway and ALB bill continuously while running.
