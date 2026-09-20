@@ -17,6 +17,7 @@ test('configuration defaults to local fake mode and rejects invalid settings', (
   assert.throws(() => loadConfig({}), /SERVICE_AUTH_SECRET/);
   assert.deepEqual(loadConfig({ SERVICE_AUTH_SECRET: TEST_SECRET }), {
     host: '127.0.0.1', port: 3001, darajaMode: 'fake', paymentStore: 'memory', databaseUrl: undefined, serviceAuthSecret: TEST_SECRET,
+    reconciliationQueueUrl: undefined, awsRegion: undefined,
     sandbox: {
       consumerKey: undefined, consumerSecret: undefined, shortcode: undefined, passkey: undefined, callbackUrl: undefined, timeoutMs: 10000,
       b2cShortcode: undefined, b2cInitiatorName: undefined, b2cSecurityCredential: undefined, b2cResultUrl: undefined, b2cTimeoutUrl: undefined,
@@ -323,6 +324,35 @@ test('creates and returns a pending payment attempt', async (t) => {
   const fetched = await getPayment(base, payment.payment_id, 'tenant_demo_001');
   assert.equal(fetched.status, 200);
   assert.deepEqual(await fetched.json(), payment);
+});
+
+test('an unconfirmed dispatch is enqueued for reconciliation instead of being silently lost', async (t) => {
+  const client = new FakeDarajaClient();
+  client.initiateStkPush = async () => { const e = new Error('timeout'); e.code = 'DARAJA_TIMEOUT'; throw e; };
+  client.initiateB2C = async () => { const e = new Error('timeout'); e.code = 'DARAJA_TIMEOUT'; throw e; };
+  const enqueued = [];
+  const reconciliationQueue = { enqueue: async (message) => { enqueued.push(message); } };
+  const server = createApp({ darajaClient: client, serviceAuthSecret: TEST_SECRET, reconciliationQueue, log: () => {} });
+  t.after(() => new Promise((resolve) => { server.close(resolve); server.closeAllConnections(); }));
+  server.listen(0, '127.0.0.1');
+  await once(server, 'listening');
+  const base = `http://127.0.0.1:${server.address().port}`;
+
+  const paymentResponse = await requestPayment(base, validPayment);
+  assert.equal(paymentResponse.status, 202);
+  const payment = await paymentResponse.json();
+
+  const payoutResponse = await requestPayout(base, {
+    tenant_id: 'tenant_demo_001', attendant_id: 'attendant_demo_001', commission_run_id: 'run_demo_001',
+    amount_minor: 2500, currency: 'KES', recipient_phone: '+254700000002',
+  });
+  assert.equal(payoutResponse.status, 202);
+  const payout = await payoutResponse.json();
+
+  assert.deepEqual(enqueued, [
+    { type: 'payment', id: payment.payment_id },
+    { type: 'payout', id: payout.payout_id },
+  ]);
 });
 
 test('returns the same payment for an identical retry without a second dispatch', async (t) => {

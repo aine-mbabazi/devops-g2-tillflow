@@ -65,7 +65,7 @@ function validatePayout(body, idempotencyKey) {
   return { ...request, idempotencyKey: idempotencyKey.trim(), fingerprint: JSON.stringify(request) };
 }
 
-export function createApp({ darajaClient, serviceAuthSecret, paymentStore = new InMemoryPaymentStore(), payoutStore = new InMemoryPayoutStore(), log = () => {} }) {
+export function createApp({ darajaClient, serviceAuthSecret, paymentStore = new InMemoryPaymentStore(), payoutStore = new InMemoryPayoutStore(), log = () => {}, reconciliationQueue }) {
   if (!darajaClient) throw new Error('A Daraja client is required');
   if (!serviceAuthSecret) throw new Error('A service auth secret is required');
 
@@ -123,6 +123,7 @@ export function createApp({ darajaClient, serviceAuthSecret, paymentStore = new 
         } catch (error) {
           // It is already recorded: reconciliation, never another create, resolves this later.
           log({ event: 'provider_dispatch_unconfirmed', paymentId: result.payment.id, code: error.code ?? 'UNKNOWN' });
+          await reconciliationQueue?.enqueue({ type: 'payment', id: result.payment.id });
         }
       }
       statusCode = result.payment.status === 'pending' ? 202 : 200;
@@ -187,6 +188,7 @@ export function createApp({ darajaClient, serviceAuthSecret, paymentStore = new 
         } catch (error) {
           // Same rule as payments: already durably recorded, reconciliation resolves it, never another create.
           log({ event: 'provider_dispatch_unconfirmed', payoutId: result.payout.id, code: error.code ?? 'UNKNOWN' });
+          await reconciliationQueue?.enqueue({ type: 'payout', id: result.payout.id });
         }
       }
       statusCode = result.payout.status === 'pending' ? 202 : 200;
