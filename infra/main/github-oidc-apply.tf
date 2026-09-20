@@ -140,6 +140,18 @@ data "aws_iam_policy_document" "github_apply_permissions" {
       "kms:CancelKeyDeletion",
       "kms:TagResource",
       "kms:UntagResource",
+      "kms:DescribeKey",
+    ]
+    resources = ["*"]
+  }
+
+  statement {
+    sid    = "EnhancedScanning"
+    effect = "Allow"
+    actions = [
+      "inspector2:Enable",
+      "inspector2:Disable",
+      "inspector2:BatchGetAccountStatus",
     ]
     resources = ["*"]
   }
