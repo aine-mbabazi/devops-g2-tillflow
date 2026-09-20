@@ -38,7 +38,7 @@ be reviewed and taken over by the Product + POS DRI going forward.
 ## Reproduction commands
 
 ```bash
-cd services/pos && npm test   # 12/12
+cd services/pos && npm test   # 22/22
 ```
 
 No external services required — the suite spins up a live Payments server

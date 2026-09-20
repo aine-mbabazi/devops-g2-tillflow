@@ -22,9 +22,9 @@ idempotency, reconciliation and replay, per [`docs/ownership.md`](../../docs/own
 ## Reproduction commands
 
 ```bash
-cd services/payments && npm test    # 26/26
+cd services/payments && npm test    # 29/29
 cd services/commission && npm test  # 9/9
-cd services/pos && npm test         # 12/12
+cd services/pos && npm test         # 22/22
 ```
 
 No external services, credentials, or network access required — both suites
