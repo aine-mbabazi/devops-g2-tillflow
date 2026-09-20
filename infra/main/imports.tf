@@ -9,20 +9,20 @@
 
 import {
   to = aws_s3_bucket.artifacts
-  id = "devops-g2-artifacts-${local.account_id}"
+  id = "devops-g2-artifacts-240462142849"
 }
 
 import {
   to = aws_s3_bucket.logs
-  id = "devops-g2-logs-${local.account_id}"
+  id = "devops-g2-logs-240462142849"
 }
 
 import {
   to = aws_s3_bucket.backups
-  id = "devops-g2-backups-${local.account_id}"
+  id = "devops-g2-backups-240462142849"
 }
 
 import {
   to = aws_s3_bucket.evidence
-  id = "devops-g2-evidence-${local.account_id}"
+  id = "devops-g2-evidence-240462142849"
 }
