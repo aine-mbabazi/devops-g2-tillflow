@@ -135,6 +135,8 @@ data "aws_iam_policy_document" "github_actions_permissions" {
       "kms:ListAliases",
       "kms:GetKeyRotationStatus",
       "scheduler:GetSchedule",
+      "lambda:GetFunctionCodeSigningConfig",
+      "ecr:GetRegistryScanningConfiguration",
       "synthetics:GetCanary",
       "synthetics:ListTagsForResource",
       "ec2:Describe*",
