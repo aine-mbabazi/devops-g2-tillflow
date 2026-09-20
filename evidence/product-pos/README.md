@@ -30,10 +30,11 @@ be reviewed and taken over by the Product + POS DRI going forward.
   as Payments (`services/_shared/service-auth.js`) — a tenant ID in a
   request body or query string is never authorization on its own.
 - `PostgresSaleStore` / `PostgresTenantStore` — durable-storage equivalents
-  of the in-memory stores, behind `POS_STORE=memory|postgres`, with
-  migrations in `services/pos/migrations/`. No RDS instance exists yet
-  (Platform + delivery), so this is code-ready but not yet actually durable
-  anywhere it runs.
+  of the in-memory stores, with migrations in `services/pos/migrations/`.
+  **Live as of 2026-09-21**: the deployed POS task definition sets
+  `POS_STORE=postgres` against the real `devops-g2-db` RDS instance, not
+  just code-ready behind a flag — see "Known gaps" for what that does and
+  doesn't prove yet.
 
 ## Reproduction commands
 
@@ -57,9 +58,10 @@ flow is proven end to end, not mocked.
 | 8 | Cross-tenant reads and writes are rejected without leaking data | "a tenant ID in the body alone is not authorization..." and the tenant-config cross-tenant test |
 | 10 | Invalid or conflicting results can't mark a sale paid and are surfaced for investigation | "a reconciled payment that does not match the sale record is not applied, and is flagged" |
 
-Scenario 9 (a POS restart eventually recording the sale paid) is only
-provable once `POS_STORE=postgres` runs against a real RDS instance, which
-doesn't exist yet — see "Known gaps."
+Scenario 9 (a POS restart eventually recording the sale paid) is
+infra-capable now — `POS_STORE=postgres` runs against the real, deployed
+`devops-g2-db` RDS instance — but no one has actually killed a task and
+confirmed the sale still resolves to paid afterward. See "Known gaps."
 
 ## Known gaps
 
@@ -74,9 +76,17 @@ doesn't exist yet — see "Known gaps."
   Commission ↔ POS). It doesn't address how an end-user-facing Web app
   would authenticate individual owners/attendants — that's a different
   problem (user auth, not service auth) and is out of scope here.
-- **No RDS instance provisioned.** `PostgresSaleStore`/`PostgresTenantStore`
-  exist and have migrations, but nothing in `infra/` provisions the
-  database itself (Platform + delivery) — every deployed environment still
-  runs `POS_STORE=memory`.
-- **Not deployed.** No `infra/` changes accompany this — no ECS service,
-  ECR repo, or CI/CD stage exists for `services/pos/` yet.
+- **Restart durability is not drilled.** RDS is provisioned and
+  `POS_STORE=postgres` is live in production (updated 2026-09-21 — a
+  Terraform state-drift bug had blocked every infra apply for days; see
+  `docs/scar-log.md`), so the durability path scenario 9 needs actually
+  exists now. What's still missing is the drill itself: killing a running
+  POS task and confirming a sale resolves to paid afterward, rather than
+  assuming the Postgres store makes it so.
+- **Deployed.** ECS service `devops-g2-pos`, ECR repo `devops-g2/pos`, and
+  the `release-pos.yml` CI/CD stage all exist and are confirmed green as of
+  2026-09-20/21 — reproduce with:
+  ```bash
+  aws ecs describe-services --cluster devops-g2 --services devops-g2-pos \
+    --region us-east-2 --query 'services[0].{running:runningCount,desired:desiredCount,taskDefinition:taskDefinition}'
+  ```

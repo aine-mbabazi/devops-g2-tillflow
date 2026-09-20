@@ -166,20 +166,44 @@ calls `enqueue` on both dispatch-failure sites.
 ## Known gaps (still not covered)
 
 - **Not yet run against the real Daraja sandbox** — only the deterministic
-  fake adapter, per the brief's CI rule. Real sandbox credentials require
-  Platform to provision Secrets Manager values first.
-- **No RDS instance provisioned.** `PostgresPaymentStore`/`PostgresPayoutStore`
-  (Payments) and the newly-added `PostgresSaleStore`/`PostgresTenantStore`
-  (POS) and `PostgresCommissionLedger` (Commission) all exist, are wired
-  behind a `*_STORE=memory|postgres` config flag, and have migrations —
-  but no RDS instance exists yet (Platform + delivery, tracked separately),
-  so every deployed environment still runs in memory. This is genuinely
-  blocked on infra, not a code gap.
-- **No trace evidence yet.** OTel/ADOT wiring for the payments service is
-  in a separate, not-yet-merged PR (#24).
-- **POS and Commission are not yet deployed** — no ECS service, ECR repo,
-  or CI/CD release stage exists for either yet (Platform + delivery scope).
-- **`SERVICE_AUTH_SECRET` (and `DATABASE_URL`, for whichever service turns
-  on `*_STORE=postgres` first) are not yet wired into deployed
-  infrastructure** — needs a Secrets Manager entry and task-definition env
-  vars before any of this runs in ECS.
+  fake adapter, per the brief's CI rule. Real sandbox credentials still need
+  to be provisioned in Secrets Manager.
+- **No exported trace evidence yet.** The ADOT sidecar is merged and deployed
+  (`infra/main/payments-task.tf`, `pos-task.tf`, `commission-task.tf`) and
+  `docs/pos-spans.md` documents the intended span tree, but no actual
+  captured trace (sale → payment → callback/reconciliation) has been
+  exported as evidence.
+- **Durability under restart is infra-capable but not drilled.** Both
+  Payments and POS run `PAYMENT_STORE=postgres` / `POS_STORE=postgres`
+  against a real RDS instance in production now (see below) — the code path
+  scenario 9 needs is live — but nobody has actually killed a task and
+  confirmed a sale still resolves to paid afterward. That's an explicit gap,
+  not an assumption either way.
+
+**Updated 2026-09-21 — the infra gaps above are resolved, not still open:**
+
+- **RDS is provisioned and live.** `devops-g2-db` (Postgres 16, `db.t4g.micro`)
+  exists; both `PAYMENT_STORE=postgres` and `POS_STORE=postgres` are set in
+  the deployed task definitions, not just code-ready behind a flag. A state
+  drift bug had left 4 unrelated S3 buckets out of Terraform's tracked state
+  and was blocking every `Infra Apply` run for days (see `docs/scar-log.md`,
+  2026-09-20 entries) — fixed via PRs #58–#60. A `terraform apply` run after
+  those fixes reported `No changes. Your infrastructure matches the
+  configuration.` — reproduce with:
+  ```bash
+  aws rds describe-db-instances --db-instance-identifier devops-g2-db \
+    --region us-east-2 --query 'DBInstances[0].DBInstanceStatus' --output text
+  ```
+- **POS and Commission are deployed**, not pending. POS runs as ECS service
+  `devops-g2-pos`; Commission runs as an EventBridge-scheduled ECS task
+  (`aws_scheduler_schedule.commission_daily`), deliberately not a persistent
+  service. Both have working release pipelines (`.github/workflows/release-pos.yml`,
+  `release-commission.yml`), confirmed green on 2026-09-20/21. Reproduce:
+  ```bash
+  aws ecs describe-services --cluster devops-g2 --services devops-g2-pos devops-g2-payments \
+    --region us-east-2 --query 'services[].{name:serviceName,running:runningCount,desired:desiredCount}'
+  ```
+- **`SERVICE_AUTH_SECRET` and `DATABASE_URL` are wired into deployed
+  infrastructure** via Secrets Manager (`devops-g2/service-auth`,
+  `devops-g2/db`) and referenced directly in the task definitions — not a
+  remaining step.
