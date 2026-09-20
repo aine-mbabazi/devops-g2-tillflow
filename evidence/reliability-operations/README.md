@@ -327,3 +327,35 @@ explanation and these are the places where neither yet exists.
   the `arn_suffix` is not knowable at commit time.
 - **The k6 runs are local.** See the capacity model — they characterise
   correctness and shape, not the deployed envelope.
+
+## Live alert delivery — confirmed 2026-09-20
+
+A manual SNS publish to `devops-g2-alerts` was used to prove the full alert
+path end to end, not just that it's declared in Terraform:
+
+```bash
+aws sns publish --topic-arn arn:aws:sns:us-east-2:240462142849:devops-g2-alerts \
+  --message '{"AlarmName":"test-manual-trigger","NewStateValue":"ALARM","NewStateReason":"Manual test trigger"}' \
+  --region us-east-2
+```
+
+CloudWatch Logs for `devops-g2-slack-notifier` confirm successful delivery:
+
+{"event":"alert_delivered","alarm":"test-manual-trigger","state":"ALARM"}
+
+The message landed in `devops-group-2` on Slack, correctly rendered through
+the full alert contract from `docs/alert-contract.md` (environment, service,
+owner, symptom, user/SLO impact, first safe action) — screenshot in this
+evidence folder.
+
+Two real issues were found and fixed to get here, both worth noting since they
+reflect genuine operational behavior rather than a smoothed-over demo:
+
+- The `devops-g2/slack-webhook` secret was left in a pending-deletion state
+  from an earlier `terraform destroy` cycle and had to be restored and
+  repopulated with a real webhook URL before any delivery could succeed.
+- The Lambda intentionally caches the webhook URL per warm container (see the
+  comment in `index.mjs`) to avoid a Secrets Manager call on every alarm —
+  which means a secret rotation is not picked up until the next cold start.
+  This was observed directly: updating the secret alone did not fix delivery
+  until the function's execution environments were recycled.
