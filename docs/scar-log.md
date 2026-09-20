@@ -131,3 +131,30 @@ earlier this week — a role that has only ever needed a subset of an AWS
 service's actions surfaces a new, narrowly specific gap exactly when a
 genuinely new *kind* of change (not just a new resource) is introduced, one
 action at a time.
+
+## 2026-09-20 — Destroying untracked drift exposed a second, larger read gap
+
+The same apply above also destroyed `aws_iam_role_policy_attachment
+.github_actions_readonly` — a `ReadOnlyAccess` managed-policy attachment on
+`devops-g2-ci-deploy` that existed in AWS but was never written into
+`github-oidc.tf`. Untracked drift, and Terraform correctly reconciled it
+away since nothing in configuration asked for it.
+
+The very next PR's `terraform plan` (same `ci-deploy` role, used by both
+`pr.yml` and `infra-apply.yml`'s Plan job) then failed refreshing the S3
+buckets: `AccessDenied: s3:GetAccelerateConfiguration`. `ReadOnlyAccess` had
+been silently backstopping every read this role's own itemized
+`TerraformReadForPlan` list never actually covered. With it gone, the
+role's *real* permission set is exposed for the first time — and it was
+short three S3 read actions that don't follow the `GetBucket*` naming
+pattern the existing wildcard matches: `GetAccelerateConfiguration`,
+`GetObjectLockConfiguration`, `GetReplicationConfiguration`.
+
+Fixed by adding those three explicitly.
+
+Lesson: an untracked, broad, manually-attached policy does not just violate
+least-privilege on paper — it actively hides how incomplete the
+Terraform-managed policy underneath it really is, and the gap only surfaces
+at the worst possible time: the moment something finally removes the
+crutch. Worth an explicit periodic check for drift like this rather than
+waiting to discover it this way again.
