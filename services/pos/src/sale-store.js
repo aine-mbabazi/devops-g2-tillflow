@@ -65,6 +65,6 @@ export class InMemorySaleStore {
 export function toSaleResponse(sale) {
   return {
     sale_id: sale.id, tenant_id: sale.tenantId, attendant_id: sale.attendantId, line_items: sale.lineItems,
-    amount_minor: sale.amountMinor, currency: sale.currency, status: sale.status,
+    amount_minor: sale.amountMinor, currency: sale.currency, status: sale.status, payment_id: sale.paymentId,
   };
 }
