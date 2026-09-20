@@ -130,27 +130,36 @@ jobs:
           [ "$ROLLOUT" = "COMPLETED" ] || { echo "::error::rollout did not complete"; exit 1; }
 
           echo "--- every target is healthy"
-          # ECS reporting the rollout COMPLETED does not mean the ALB target
-          # group has caught up: healthy_threshold=2 x interval=30s means a
-          # freshly-registered target can take up to ~60s to flip healthy.
-          # A single point-in-time check here raced that window and flapped
-          # the pipeline into an unnecessary rollback. Poll instead.
+          # Two things this has to account for, not one:
+          # 1. ECS reporting the rollout COMPLETED does not mean the ALB
+          #    target group has caught up: healthy_threshold=2 x
+          #    interval=30s means a freshly-registered target can take up
+          #    to ~60s to flip healthy. Poll instead of checking once.
+          # 2. This target group has no deregistration_delay override, so
+          #    it defaults to 300s. At desired_count=1, ECS briefly runs
+          #    old+new together during a rollout, and the old target sits
+          #    in the target group as "draining" for up to that long —
+          #    that's expected, not a failure. Only "unhealthy" /
+          #    "unavailable" states indicate an actual problem; treating
+          #    every non-"healthy" state as a failure counted the old
+          #    task's normal drain-out as a broken deploy.
           TG="$(aws elbv2 describe-target-groups \
             --names devops-g2-payments-tg --region us-east-2 \
             --query 'TargetGroups[0].TargetGroupArn' --output text)"
           ATTEMPTS=12
           SLEEP_SECONDS=10
-          UNHEALTHY=""
+          BAD="" HEALTHY_COUNT=""
           for i in $(seq 1 "$ATTEMPTS"); do
-            UNHEALTHY="$(aws elbv2 describe-target-health \
-              --target-group-arn "$TG" --region us-east-2 \
-              --query 'length(TargetHealthDescriptions[?TargetHealth.State!=`healthy`])' --output text)"
-            echo "attempt $i/$ATTEMPTS: unhealthy targets=$UNHEALTHY"
-            [ "$UNHEALTHY" = "0" ] && break
+            HEALTH_JSON="$(aws elbv2 describe-target-health \
+              --target-group-arn "$TG" --region us-east-2)"
+            BAD="$(echo "$HEALTH_JSON" | jq '[.TargetHealthDescriptions[] | select(.TargetHealth.State=="unhealthy" or .TargetHealth.State=="unavailable")] | length')"
+            HEALTHY_COUNT="$(echo "$HEALTH_JSON" | jq '[.TargetHealthDescriptions[] | select(.TargetHealth.State=="healthy")] | length')"
+            echo "attempt $i/$ATTEMPTS: bad=$BAD healthy=$HEALTHY_COUNT"
+            [ "$BAD" = "0" ] && [ "$HEALTHY_COUNT" -ge "1" ] && break
             sleep "$SLEEP_SECONDS"
           done
-          [ "$UNHEALTHY" = "0" ] || {
-            echo "::error::$UNHEALTHY target(s) still not healthy after $((ATTEMPTS * SLEEP_SECONDS))s"
+          { [ "$BAD" = "0" ] && [ "$HEALTHY_COUNT" -ge "1" ]; } || {
+            echo "::error::target group unhealthy after $((ATTEMPTS * SLEEP_SECONDS))s (bad=$BAD healthy=$HEALTHY_COUNT)"
             aws elbv2 describe-target-health --target-group-arn "$TG" --region us-east-2
             exit 1
           }
