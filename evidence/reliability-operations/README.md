@@ -256,6 +256,28 @@ specifies one minute so it stays, but the model documents the five-minute option
 (~$10/month, ~15 min worst-case detection) as a deliberate decision rather than
 an accident.
 
+### Live infra: smoke run confirmed, 2026-09-21
+
+`smoke.js` was run against the real deployed API Gateway/ALB
+(`POS_BASE_URL` set to `terraform output api_gateway_invoke_url`), the first
+k6 profile to leave loopback. All thresholds passed: 57 requests, 0% failed,
+checks 100%, duplicate-dispatch protection held at zero.
+
+Getting to a clean run surfaced two real gaps, both fixed rather than worked
+around:
+
+- **POS's ALB listener rule only matched `/sales*`.** Tenant config
+  read/write had no route at all and fell through to the ALB's default
+  404 action. Fixed in PR #71 by adding `/tenants*` to the same rule.
+- **A stale, previously-fetched `SERVICE_AUTH_SECRET` in a local shell
+  session caused every signed request to fail verification** with a
+  generic `401 unauthenticated`, even though the signing algorithm on
+  both sides (`load/k6/lib/auth.js` and `services/_shared/service-auth.js`)
+  matched exactly. Re-fetching the secret immediately before the run
+  resolved it — ECS injects secrets at container start, not live-reloaded,
+  so this is the same class of staleness as a rotated secret not reaching
+  a warm container until its next deploy.
+
 ---
 
 ## CI/CD and golden path
@@ -339,8 +361,13 @@ explanation and these are the places where neither yet exists.
   "imports cleanly" is an untested claim. Its ALB dimensions resolve through
   template variables at import rather than hardcoded values, precisely because
   the `arn_suffix` is not knowable at commit time.
-- **The k6 runs are local.** See the capacity model — they characterise
-  correctness and shape, not the deployed envelope.
+- **`smoke.js` has now run against the live deployed stack and passed** —
+  see the new subsection under "Load testing and capacity" below. The other
+  four profiles (`baseline`, `spike`, `soak`, `capacity`) remain local-only,
+  by deliberate choice: running load-generating profiles against a
+  `desired_count = 1` deployment this close to submission was judged too
+  risky to the live demo environment. See the capacity model — they
+  characterise correctness and shape, not the deployed envelope.
 
 ## Live alert delivery — confirmed 2026-09-20
 
