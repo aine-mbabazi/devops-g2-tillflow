@@ -235,3 +235,27 @@ weighing before the next attempt: add `deployment_circuit_breaker` with
 depending on the workflow noticing), and/or increase or replace the
 `aws ecs wait services-stable` timeout so a true rollback success is
 reported as one.
+
+## 2026-09-21 — Enabling the synthetic probe surfaced one more missing S3 read action
+
+Turning on the external probe (setting `synthetic_probe_url` so
+`local.probe_enabled = 1`) tried to create `aws_s3_bucket.synthetics` for
+the first time. Apply failed: `AccessDenied: ... not authorized to perform:
+s3:GetBucketAcl on resource: "arn:aws:s3:::devops-g2-synthetics-<account>"`.
+
+Same shape as every prior S3 gap in this log: `GroupScopedBuckets` is an
+itemized action list (deliberately not `s3:*`, see the comment above it),
+and `s3:GetBucketAcl` had simply never come up before because it's the
+provider refreshing a bucket attribute this project's four earlier buckets
+never happened to exercise in a way that surfaced the gap — the first new
+`aws_s3_bucket` resource created since that statement was written was
+enough to hit it.
+
+Fixed by adding `s3:GetBucketAcl` to `GroupScopedBuckets`, same
+`devops-g2-*` bucket scope as the rest of that statement.
+
+Lesson: identical to the earlier S3 and IAM gaps — an itemized least-
+privilege policy is correct, but it means literally *any* new resource of a
+kind the role has handled before can still surface a permission nobody
+predicted, because the provider's own refresh/read behavior for that
+resource type was never exercised end to end until now.
