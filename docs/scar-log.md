@@ -287,3 +287,61 @@ new *kinds* of change (the more common shape elsewhere in this log), it's
 worth reasoning about the whole family of actions the provider exercises for
 that resource type and fixing it in one pass instead of continuing to pay
 the apply-and-wait cost per action.
+
+## 2026-09-21 — The synthetic probe could not be a Synthetics canary
+
+**What happened.** `Infra Apply` failed five times in a row, each on a different
+error, each one further along than the last. The last two were about the canary:
+Lambda rejected `MemorySize: 960` because this account caps it at 512, and the
+Terraform provider then rejected `memory_in_mb = 512` because it enforces a 960
+floor for canaries.
+
+**Root cause.** Those two constraints cannot both be satisfied. An
+`aws_synthetics_canary` is not creatable in this account at any memory value.
+Raising the Lambda quota is an AWS support request, not a code change.
+
+**Resolution.** Replaced the canary with an EventBridge-scheduled Lambda that
+performs the same checks against the same public entry point and publishes
+`SuccessPercent` to `TillFlow/synthetics`. The probe is still external, still
+runs every minute, and still alarms with `treat_missing_data = breaching`. What
+was given up is the Synthetics console's screenshot and HAR capture, which this
+system never needed — its checks are JSON API responses, not rendered pages.
+
+**Lessons.**
+
+- `terraform validate` passing is not evidence that a value is acceptable. It
+  accepted `memory_in_mb = 512` happily; the provider's range check only fires
+  at plan time. "It validates" was reported as if it meant "it will apply", and
+  it cost an apply cycle.
+- Two of the five failures (`s3:GetBucketCORS`, then `lambda:GetFunctionConfiguration`
+  on `cwsyn-*`) were **IAM propagation lag, not missing permissions** — the
+  apply role grants itself a permission and uses it under two seconds later.
+  Both were cleared by re-running with the policy already live, after several
+  PRs had been merged that added permissions which were already present. The
+  durable fix is to move the CI roles into `infra/bootstrap/`, so the role that
+  applies a change is never the role the change is granting.
+- Changing where a metric comes from silently breaks every dashboard that reads
+  it. Repointing the probe's metric required editing both the CloudWatch
+  dashboard and the Grafana JSON in the same change; neither would have failed
+  a plan, they would just have rendered blank.
+
+## 2026-09-21 — The scheduled-Lambda probe hit one more sixth: events:TagResource
+
+PR #81's own apply (destroying the canary and its bucket, creating the
+Lambda, all clean) died on the very last resource:
+`aws_cloudwatch_event_rule.probe` — `AccessDenied: ... not authorized to
+perform: events:TagResource`.
+
+Same shape as every permission gap tonight, one detail different: this
+wasn't a narrow miss on a service already in the policy, it was the first
+time this policy had ever needed classic EventBridge (`events:*`) at all.
+Commission's schedule uses the newer EventBridge *Scheduler* service
+(`scheduler:*`, a separate statement, separate ARN namespace) — nothing
+before the probe had exercised `events:*`.
+
+Fixed with a scoped wildcard (`events:*` on `rule/devops-g2-*`), matching
+this file's existing pattern for SNS/Lambda/Scheduler — a service this role
+manages entirely for itself, resource-scoped to the group prefix, rather
+than itemizing one `events:` action at a time the way `GroupScopedBuckets`
+and `GroupScopedIAM` do for the two services where a wildcard would actually
+be dangerous.
