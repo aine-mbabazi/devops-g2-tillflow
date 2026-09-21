@@ -179,20 +179,28 @@ not a measured bill** — nothing has been applied long enough to produce one.
 | ALB | 1, before LCU charges | ~$16 |
 | Synthetics canary | 1/min = 43,200 runs at $0.0012 | ~$52 |
 | RDS `db.t4g.micro` | single-AZ + 20 GB gp3 | ~$14 |
-| ECS Fargate | 2 tasks at 0.25 vCPU / 0.5 GB | ~$18 |
-| ElastiCache `cache.t4g.micro` | single node — arrives with PR #48 | ~$12 |
+| ECS Fargate | 3 continuous tasks at 0.25 vCPU / 0.5 GB (POS, Payments, Web) + Commission's daily scheduled run (~$0, sub-cent) | ~$27 |
+| ElastiCache `cache.t4g.micro` | single node, live | ~$12 |
 | CloudWatch alarms | 16 at $0.10 | ~$2 |
 | Custom metrics | 8 log-derived at $0.30 | ~$2 |
 | KMS | 1 customer-managed key | ~$1 |
 | Lambda, S3, SQS, DynamoDB, Secrets Manager | at this volume | <$2 |
-| | | **~$152** |
+| | | **~$161** |
 
-**The one-minute synthetic probe is the second-largest line item** — more than
-the database, and more than both application services combined. The brief
-specifies one minute, so it stays; dropping to five minutes would cost ~$10
-instead of ~$52, at the price of ~15 minutes' worst-case detection instead of
-~3. [`docs/capacity-model.md`](docs/capacity-model.md) argues that trade in
-full rather than leaving it an accident.
+**The one-minute synthetic probe is the single largest line item** — more
+than the NAT Gateway, more than the database, and more than all three
+continuously-running application services combined. The brief specifies one
+minute, so it stays; dropping to five minutes would cost ~$10 instead of
+~$52, at the price of ~15 minutes' worst-case detection instead of ~3.
+[`docs/capacity-model.md`](docs/capacity-model.md) argues that trade in full
+rather than leaving it an accident.
+
+As of 2026-09-21, the probe itself is mid-rollout, not yet costing anything:
+`synthetic_probe_url` was wired into `infra-apply.yml` (PR #72), which
+surfaced one more missing apply-role permission (`s3:GetBucketAcl`, PR #73,
+same shape as every other itemized-permission gap in `docs/scar-log.md`).
+Once that merges and applies cleanly, the ~$52/month starts accruing — worth
+remembering when comparing an actual bill against this estimate later.
 
 The NAT gateway is the other line worth attention: VPC endpoints for ECR and
 Secrets Manager would cut its data-processing charges, though not its hourly
@@ -202,24 +210,51 @@ Costs stop when the stack is destroyed — see [Destroy](#destroy-cost-control--
 
 ## Cleanup status
 
-**Currently provisioned** (as of last update, per
-[`evidence/platform-delivery/README.md`](evidence/platform-delivery/README.md)):
-VPC, ALB, NAT Gateway, RDS PostgreSQL (single-AZ `db.t4g.micro`), an ECS
-cluster running the Payments and POS services plus the Commission scheduled
-worker, three ECR repositories (`pos`, `payments`, `commission`), five S3
-buckets (`artifacts`, `logs`, `backups`, `evidence`, `tillflow-tfstate`),
-CloudWatch logs, IAM roles, OIDC CI/CD roles. Bootstrap state backend (S3 +
-DynamoDB) also provisioned.
+**Currently provisioned, live, as of 2026-09-21** (confirmed against actual
+`infra-apply` run logs, not just merged PRs — several docs in this repo had
+gone stale claiming otherwise):
 
-**Not confirmed live:** ElastiCache (Valkey) and the SQS reconciliation
-queue/DLQ exist in `infra/main/` but `evidence/platform-delivery/README.md`'s
-"Known gaps" section states no `terraform apply` had run for them from that
-branch; API Gateway + VPC Link is tracked separately on PR #46 and that same
-doc calls it not yet provisioned. Verify current apply state before relying
-on this.
+- VPC, ALB (internal), NAT Gateway (single), API Gateway + VPC Link as the
+  public entry point (`api_gateway_invoke_url` output, live since 2026-09-18).
+- RDS PostgreSQL (single-AZ `db.t4g.micro`).
+- ElastiCache (Valkey, `cache.t4g.micro`, single node) and the SQS
+  reconciliation queue + DLQ — both live, despite earlier evidence docs
+  claiming no apply had run for them.
+- ECS cluster running Payments, POS, and Web as continuous services, plus
+  Commission as a daily EventBridge-scheduled task (deliberately no
+  continuous service for Commission — see `commission-task.tf`).
+- Four ECR repositories (`pos`, `payments`, `commission`, `web`).
+- S3: `artifacts`, `logs`, `backups`, `evidence` (in `infra/main`), plus the
+  bootstrap state backend bucket + DynamoDB lock table (`infra/bootstrap`).
+- CloudWatch logs, alarms, IAM roles, OIDC CI/CD roles.
 
-Update this section before/after each gate to reflect whether infra is
-live or torn down, since the NAT Gateway and ALB bill continuously while running.
+**Mid-rollout:** the external synthetic probe (canary + its own S3 bucket)
+is wired but not yet applying cleanly — PR #72 set `synthetic_probe_url`,
+which surfaced a missing apply-role permission fixed in PR #73
+(`s3:GetBucketAcl`). Once both merge and an apply succeeds, the canary
+becomes the largest line item in [Cost](#cost) above.
+
+**Not yet exercised:** a full `terraform destroy` + rebuild cycle for the
+*current* set of resources. A partial destroy did happen once earlier in the
+project (see the `devops-g2/slack-webhook` secret's pending-deletion
+incident in `evidence/reliability-operations/README.md`'s "Live alert
+delivery" section) — real evidence a destroy cycle occurred, but not a
+clean, complete, timed one against today's stack. Two known blockers if
+`terraform destroy` is run as-is, before any object/image cleanup:
+- None of the four S3 buckets in `infra/main` set `force_destroy = true`,
+  so a bucket holding any object (including old versions, since versioning
+  is on) will block its own destroy until emptied manually or the buckets
+  are given `force_destroy` first.
+- ECR repositories have no `force_delete` set either, so a non-empty
+  repository blocks the same way.
+
+RDS itself destroys cleanly with no manual snapshot step
+(`skip_final_snapshot = true`, `deletion_protection = false` in `rds.tf`).
+
+**Everything above is intentionally still running** for tonight's defence —
+do not destroy before that. Update this section immediately after tearing
+anything down, since the NAT Gateway, ALB, and (once live) the synthetic
+probe all bill continuously while running.
 
 ## Documentation index
 
