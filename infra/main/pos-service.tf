@@ -32,7 +32,7 @@ resource "aws_lb_listener_rule" "pos" {
 
   condition {
     path_pattern {
-      values = ["/sales*"]
+      values = ["/sales*", "/tenants*"]
     }
   }
 
