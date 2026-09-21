@@ -91,6 +91,13 @@ jobs:
           path: infra/main/.build/
           retention-days: 5
           if-no-files-found: error
+          # .build is a dot-directory, and upload-artifact v4 defaults
+          # include-hidden-files to false — so a directory path matches nothing
+          # and the step fails with "No files were found". The step this
+          # replaced pointed at one explicit file, which is why it never hit
+          # this. Without it the plan job fails after a completely successful
+          # plan, which reads as a Terraform problem and is not one.
+          include-hidden-files: true
 
   apply:
     name: Apply
