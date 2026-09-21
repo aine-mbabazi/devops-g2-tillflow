@@ -353,14 +353,40 @@ explanation and these are the places where neither yet exists.
 - **RTO and RPO are asserted, not measured.** The 30-minute and 5-minute figures
   are design intent derived from how the mechanisms work. Only the restore drill
   converts them into evidence.
-- **The probe has never run.** It stays unprovisioned until
-  `synthetic_probe_url` is set, which needs the API Gateway branch merged and
-  applied first.
-- **The Grafana dashboard has not been rendered.** No Grafana instance exists.
-  The JSON is committed and its queries mirror the CloudWatch dashboard's, but
-  "imports cleanly" is an untested claim. Its ALB dimensions resolve through
-  template variables at import rather than hardcoded values, precisely because
-  the `arn_suffix` is not knowable at commit time.
+- **The probe is provisioned but stuck in `ERROR`, and the fix already
+  written in code cannot be applied.** `synthetic_probe_url` has been set and
+  the canary exists live (confirmed via `aws synthetics describe-canaries`),
+  but `CREATE_FAILED` with `MemorySize` must be `<= 512` — this account caps
+  Lambda memory at 512 MB. `synthetics.tf` already documents this exact error
+  and sets `memory_in_mb = 512` to match it, but `terraform plan` rejects that
+  value at the client-side validation stage: `expected run_config.0.memory_in_mb
+  to be at least (960), got 512` — the Terraform AWS provider itself enforces
+  a 960 MB floor for the `syn-nodejs-puppeteer-9.0` runtime. AWS's account-level
+  cap and the provider's own validation are mutually exclusive for this
+  runtime; no value of `memory_in_mb` satisfies both. Fixing this needs either
+  a non-puppeteer Synthetics runtime with a lower memory floor, or an AWS
+  Lambda memory quota increase for this account — neither attempted here.
+- **The Grafana dashboard has now been rendered against live CloudWatch,
+  confirmed 2026-09-21.** A local Grafana instance (Docker) was pointed at a
+  CloudWatch data source using the account's own credentials, and
+  `tillflow-slo-dashboard.json` was imported without modification. The
+  template variables resolved correctly against the real, live resources —
+  `targetgroup/devops-g2-pos-tg/7e582f96ac9b869f`,
+  `targetgroup/devops-g2-payments-tg/6b64453da157a4f8`, and
+  `app/devops-g2-alb-iac/0457a5b4bad84da8` — proving the `arn_suffix`
+  auto-discovery this dashboard was designed around actually works, not just
+  that the JSON is syntactically valid.
+
+  Every panel shows "No data," which is expected, not a failure: the uptime
+  panels query the synthetic probe (`CloudWatchSynthetics`/`SuccessPercent`,
+  `CanaryName: devops-g2-probe`), and the probe is stuck in `ERROR` rather
+  than actually running — see the bullet above. The RED panels need sustained
+  traffic in the query
+  window; the only load run against the deployed stack so far is the 30-second
+  k6 smoke run (see "Load testing and capacity" above), which is too brief and
+  too far outside the default 6-hour window to register. "Imports cleanly
+  against real infra" is now proven; "shows real data" still needs either the
+  probe running or a sustained load window, neither attempted here.
 - **`smoke.js` has now run against the live deployed stack and passed** —
   see the new subsection under "Load testing and capacity" below. The other
   four profiles (`baseline`, `spike`, `soak`, `capacity`) remain local-only,
