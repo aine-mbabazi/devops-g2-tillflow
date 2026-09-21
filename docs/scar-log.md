@@ -259,3 +259,31 @@ privilege policy is correct, but it means literally *any* new resource of a
 kind the role has handled before can still surface a permission nobody
 predicted, because the provider's own refresh/read behavior for that
 resource type was never exercised end to end until now.
+
+## 2026-09-21 — GetBucketAcl fix retried into GetBucketCORS: fixed the whole family at once
+
+The `GetBucketAcl` fix above hit two things back to back on the next two
+apply attempts:
+
+1. The immediate retry (same permission, moments after granting it) failed
+   with the identical `AccessDenied` — IAM eventual consistency, same shape
+   as the `iam:UpdateAssumeRolePolicy` self-grant earlier tonight. A second
+   retry, a few minutes later, got past it cleanly.
+2. That successful retry immediately hit a *different* denial:
+   `s3:GetBucketCORS`, same `aws_s3_bucket.synthetics` resource, same
+   create-then-read pattern.
+
+Rather than fix these one at a time — each cycle costs a PR, a merge, an
+apply, and a wait for IAM to catch up — added the rest of the sub-
+configuration read actions the provider checks on every `aws_s3_bucket`
+create/refresh in one pass: `GetBucketCORS`, `GetBucketWebsite`,
+`GetBucketLogging`, `GetBucketObjectLockConfiguration`,
+`GetBucketRequestPayment`, `GetReplicationConfiguration`,
+`GetAccelerateConfiguration`.
+
+Lesson: when a resource type's permission gaps are surfacing one-by-one
+through repeated apply/fail cycles rather than one-by-one through genuinely
+new *kinds* of change (the more common shape elsewhere in this log), it's
+worth reasoning about the whole family of actions the provider exercises for
+that resource type and fixing it in one pass instead of continuing to pay
+the apply-and-wait cost per action.
