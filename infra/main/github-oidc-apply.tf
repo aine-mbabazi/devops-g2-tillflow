@@ -119,6 +119,41 @@ data "aws_iam_policy_document" "github_apply_permissions" {
     resources = ["arn:aws:lambda:us-east-2:${local.account_id}:function:${local.name_prefix}-*"]
   }
 
+  # CloudWatch Synthetics does not run a canary directly — it creates a Lambda
+  # function and a layer behind the scenes, named cwsyn-<canary>-<uuid>. The
+  # principal creating the canary is the principal that must be allowed to
+  # manage them, and cwsyn-* does not match the devops-g2-* prefix above, so
+  # canary creation failed with CREATE_FAILED / lambda:GetFunctionConfiguration
+  # denied on cwsyn-devops-g2-probe-<uuid>.
+  #
+  # Granted as lambda:* over the cwsyn-* function and layer ARNs rather than
+  # enumerating actions. The create path alone needs CreateFunction,
+  # GetFunctionConfiguration, UpdateFunctionCode, UpdateFunctionConfiguration,
+  # PublishVersion, AddPermission, PublishLayerVersion and GetLayerVersion, and
+  # delete and update need more again — enumerating them is how this turns into
+  # one failed apply per missing action, which has already cost this project
+  # several cycles today.
+  statement {
+    sid     = "SyntheticsManagedLambda"
+    effect  = "Allow"
+    actions = ["lambda:*"]
+    resources = [
+      "arn:aws:lambda:us-east-2:${local.account_id}:function:cwsyn-*",
+      "arn:aws:lambda:us-east-2:${local.account_id}:layer:cwsyn-*",
+      "arn:aws:lambda:us-east-2:${local.account_id}:layer:cwsyn-*:*",
+    ]
+  }
+
+  # The canary runtime is delivered as an AWS-owned Lambda layer that lives in
+  # an AWS-operated account, so it cannot be scoped to this account's ARNs.
+  # Read-only on layer versions.
+  statement {
+    sid       = "SyntheticsRuntimeLayer"
+    effect    = "Allow"
+    actions   = ["lambda:GetLayerVersion"]
+    resources = ["arn:aws:lambda:us-east-2:*:layer:Synthetics*"]
+  }
+
   # kms:CreateKey cannot be resource-scoped — the key does not exist yet, and
   # there is no ARN to name. The alias and post-creation actions could be
   # scoped, but splitting them across two statements for one key buys nothing.
