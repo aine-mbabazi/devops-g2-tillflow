@@ -112,6 +112,17 @@ work that was previously done by a person reading
 (bounded at 10 minutes) and DLQ depth (threshold zero: one message is a payment
 nobody can account for).
 
+**No AWS CodePipeline lane.** The brief requires two delivery lanes; only the
+GitHub Actions lane exists. This is a knowingly unmet requirement with a
+recorded rationale — see
+[ADR 0005](../../docs/adr/0005-no-codepipeline-lane.md). The short version:
+`aws_codestarconnections_connection` cannot be completed by Terraform (the
+GitHub handshake needs a human in the console), the apply role lacks all three
+required services, and the apply pipeline was red on the final day. Every
+capability that lane was meant to prove — scan gate, SBOM, digest-pinned ECR
+deploy, deployment health gate, rollback — is exercised in the GitHub Actions
+lane instead. What is genuinely lost is lane independence.
+
 ## Known gaps (deferred to G3)
 API Gateway + VPC Link — the ALB is internal-only, so there is no
 public entry point yet. The Terraform exists on a separate branch
