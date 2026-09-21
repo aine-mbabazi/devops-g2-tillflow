@@ -69,11 +69,26 @@ jobs:
           retention-days: 5
           if-no-files-found: error
 
-      - name: Upload lambda package
+      # Every archive_file package, not an enumerated list of them.
+      #
+      # archive_file is a data source: it writes its zip while the PLAN is
+      # being computed, in this job's workspace. `terraform apply tfplan` does
+      # not re-read data sources, and .build/ is gitignored, so the apply job's
+      # fresh checkout has no zips at all — it fails with "open
+      # ./.build/<name>.zip: no such file or directory".
+      #
+      # This was already worked around for the Lambda by naming its zip
+      # explicitly. The synthetic probe's canary zip was then added without a
+      # matching step, and the apply failed on exactly that. Uploading the
+      # whole directory means the next archive_file cannot reintroduce this.
+      #
+      # It also keeps the approval honest: the apply runs the same bytes the
+      # reviewer's plan was computed from, rather than a zip rebuilt later.
+      - name: Upload Terraform-built packages
         uses: actions/upload-artifact@v4
         with:
-          name: slack-notifier-zip-${{ github.run_id }}
-          path: infra/main/.build/slack-notifier.zip
+          name: tf-build-${{ github.run_id }}
+          path: infra/main/.build/
           retention-days: 5
           if-no-files-found: error
 
@@ -120,10 +135,10 @@ jobs:
           name: tfplan-${{ github.run_id }}
           path: infra/main
 
-      - name: Download lambda package
+      - name: Download Terraform-built packages
         uses: actions/download-artifact@v4
         with:
-          name: slack-notifier-zip-${{ github.run_id }}
+          name: tf-build-${{ github.run_id }}
           path: infra/main/.build
 
       # Applying the saved plan file, not a freshly computed one: what a
