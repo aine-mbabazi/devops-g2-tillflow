@@ -348,8 +348,17 @@ explanation and these are the places where neither yet exists.
   but timed over budget, so it is not a passing Drill 4.
 - **Drill 5 (restore) was executed but is not a full pass.** An RDS
   point-in-time restore completed in 35m 21s, exceeding the stated 30-minute
-  RTO target. The required post-restore provider-reference reconciliation was
-  not captured, so Drill 5 cannot be recorded as passing.
+  RTO target. A second attempt at the post-restore reconciliation step
+  (comparing row counts and finding pending payments needing a Daraja
+  re-query) could not be completed: the restored instance sits in the same
+  private subnet as the live database, unreachable from outside the VPC, and
+  no in-VPC vantage point (bastion, ECS exec) was available in the time
+  remaining. The restore's success and its RTO measurement stand as evidence;
+  the reconciliation step itself remains unexecuted, both times, for the same
+  underlying reason — this environment has no supported way to reach RDS
+  directly, which is itself worth noting as an operational gap in the
+  runbook. The throwaway restore instance was deleted immediately after
+  (`skip_final_snapshot`) to avoid ongoing cost.
 - **RTO and RPO are asserted, not measured.** The 30-minute and 5-minute figures
   are design intent derived from how the mechanisms work. Only the restore drill
   converts them into evidence.
