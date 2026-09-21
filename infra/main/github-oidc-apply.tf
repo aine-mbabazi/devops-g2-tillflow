@@ -253,6 +253,18 @@ data "aws_iam_policy_document" "github_apply_permissions" {
       "s3:PutBucketPublicAccessBlock",
       "s3:GetLifecycleConfiguration",
       "s3:PutLifecycleConfiguration",
+      # The provider's aws_s3_bucket read/refresh checks every one of these
+      # sub-configurations on a freshly created bucket, whether or not the
+      # resource actually sets them. GetBucketAcl surfaced first (2026-09-21),
+      # then GetBucketCORS immediately after on retry — added the rest of the
+      # set up front rather than discovering each one on its own apply cycle.
+      "s3:GetBucketCORS",
+      "s3:GetBucketWebsite",
+      "s3:GetBucketLogging",
+      "s3:GetBucketObjectLockConfiguration",
+      "s3:GetBucketRequestPayment",
+      "s3:GetReplicationConfiguration",
+      "s3:GetAccelerateConfiguration",
       "s3:GetObject",
       "s3:PutObject",
       "s3:DeleteObject",
