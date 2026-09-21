@@ -347,12 +347,8 @@ test('/ready reports ready when the store pings, and not_ready when it throws', 
 
   // Liveness must stay green even when the store is unreachable: a database
   // blip must not cause the ALB to replace every task.
-  //
-  // Game day drill 4 (docs/runbook.md#game-day-drills): /health is
-  // deliberately broken right now, so these two assertions are flipped to
-  // 500 to match. Revert alongside app.js once the drill is recorded.
   const health = await fetch(`${base}/health`);
-  assert.equal(health.status, 500);
+  assert.equal(health.status, 200);
 
   // A store whose ping rejects must turn /ready into a 503, while /health
   // remains 200 — this is the whole point of splitting the two endpoints.
@@ -375,7 +371,7 @@ test('/ready reports ready when the store pings, and not_ready when it throws', 
   assert.deepEqual(await notReady.json(), { service: 'pos', status: 'not_ready' });
 
   const stillAlive = await fetch(`${brokenBase}/health`);
-  assert.equal(stillAlive.status, 500);
+  assert.equal(stillAlive.status, 200);
 
   assert.ok(entries.some((entry) => entry.event === 'readiness_check_failed'));
 });

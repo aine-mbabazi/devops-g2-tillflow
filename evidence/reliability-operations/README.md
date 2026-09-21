@@ -295,9 +295,13 @@ worker, so there is no rollout to watch and nothing running to roll back. Its
 safety net is the `daily_close_failed` alarm plus a re-run being provably safe.
 The workflow says so in place rather than being silently inconsistent.
 
-**Not proven:** no release workflow has run since these changes, so the smoke
-and the rollback are untested against a real deploy. Proving the rollback is
-the G4 "broken release" drill, which has not been run.
+**Now exercised:** drill 4 (below) ran a real release against a deliberately
+broken image. The smoke check and automated rollback both engaged against a
+real deploy; the recovery took longer than the 30-minute RTO target, and the
+rollback confirmation step itself produced a false-negative timeout even
+though the rollback succeeded. See "Game day — drill 4" and
+`docs/scar-log.md` for the full timeline and the two findings that came out
+of it.
 
 ---
 
@@ -312,9 +316,14 @@ explanation and these are the places where neither yet exists.
   recovery time of 7m 23s. The required platform-failure alarm firing and
   corresponding Slack alert were not captured, so this is execution evidence,
   not a full Drill 3 pass.
-- **Drill 4 (broken release) remains unproven.** The runbook requires a
-  deliberately broken image, post-deploy smoke failure, rollback, and a timed
-  recovery under 30 minutes.
+- **Drill 4 (broken release) was executed but exceeded RTO.** A deliberately
+  broken `/health` was deployed via a real release (`release-pos.yml`); the
+  post-deploy smoke check correctly failed to stabilize and automated
+  rollback engaged. Total time from deploy start to a confirmed-good service
+  was in the 30-36 minute range — at or past the 30-minute RTO target, not
+  comfortably under it. See "Game day — drill 4" below and
+  `docs/scar-log.md` for the full timeline; this is timed, executed evidence,
+  but timed over budget, so it is not a passing Drill 4.
 - **Drill 5 (restore) was executed but is not a full pass.** An RDS
   point-in-time restore completed in 35m 21s, exceeding the stated 30-minute
   RTO target. The required post-restore provider-reference reconciliation was
@@ -418,4 +427,47 @@ effect, for the entire drill.
 stores on an ephemeral local server, not the deployed ECS/RDS stack — same
 caveat as the k6 capacity runs above. They prove the invariants hold in the
 real code; they do not prove the deployed infrastructure carries them
-through. Drills 3–5 need the live stack and have not been run.
+through. Drills 3–5 needed the live stack; all three have now been attempted
+against it, and none is a full pass yet (see "Not yet proven" above for 3
+and 5, and "Game day — drill 4" below).
+
+## Game day — drill 4, 2026-09-20 (executed, exceeded RTO)
+
+Unlike drills 1 & 2, this ran against the real deployed stack, not an
+in-memory local server: PR #67 changed `services/pos/src/app.js` so
+`GET`/`HEAD /health` always returns 500, and merged to `main`, which
+triggers `release-pos.yml` on push.
+
+```
+23:22:18Z  PR #67 merged
+23:22:59Z  Deploy to ECS started (wait-for-service-stability: true)
+23:48:37Z  Wait timed out: {"state":"TIMEOUT","observedResponses":
+           {"200: OK":9},"reason":"Waiter has timed out"} — the new
+           revision never passed ECS's own container healthcheck
+23:48:37Z  Roll back on failure fired: forced redeploy to the previous
+           task definition (devops-g2-pos:13)
+23:58:34Z  The rollback's own `aws ecs wait services-stable` ALSO timed
+           out: "Waiter ServicesStable failed: Max attempts exceeded"
+  after   Manual `describe-services` check confirmed the service was
+           actually fine: status ACTIVE, running 1/1, one PRIMARY
+           deployment on devops-g2-pos:13, rolloutState COMPLETED,
+           failedTasks 0
+```
+
+**Result:** the failure was correctly detected and the rollback did
+succeed, but total elapsed time (deploy start to confirmed-good) was in the
+30–36 minute range — at or past the 30-minute RTO target, not comfortably
+under it. Not a passing drill 4 by the runbook's own success criterion,
+even though every mechanism involved (healthcheck, smoke-equivalent wait,
+automated rollback) did the right thing.
+
+**A second finding, independent of the RTO miss:** the workflow's own
+`aws ecs wait services-stable` call is not a reliable success signal for
+this stack — its default polling budget ran out before ECS finished
+converging on both the failed forward deploy *and* the rollback, reporting
+"failed" via `exit 1` in a case where the rollback had, in fact, succeeded.
+Full timeline and remediation options (deployment circuit breaker, longer
+or different stability check) are in `docs/scar-log.md`.
+
+Revert of the intentional break: `services/pos/src/app.js` and
+`services/pos/test/pos.test.js` in this PR.
