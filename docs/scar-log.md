@@ -183,3 +183,55 @@ unrelated `apply` from `main` reasserts the old document. Merge and apply
 the branch that already has the change instead of patching the live
 resource by hand, even when the patch is byte-for-byte what the pending
 code would produce.
+
+## 2026-09-20 — Game day drill 4 (broken release) exceeded RTO, and the rollback's own success check is unreliable
+
+PR #67 deliberately broke POS's `GET/HEAD /health` (always 500) and merged
+to `main` at 23:22:18Z, triggering `release-pos.yml`.
+
+Timeline:
+- 23:22:59Z — deploy started (`aws-actions/amazon-ecs-deploy-task-definition`,
+  `wait-for-service-stability: true`).
+- 23:48:37Z — the wait timed out: `{"state":"TIMEOUT","observedResponses":
+  {"200: OK":9},"reason":"Waiter has timed out"}`. The new revision never
+  passed ECS's own container healthcheck (`wget --spider .../health`), so it
+  never reached a stable rollout. 26 minutes elapsed at this point.
+- 23:48:37Z — "Roll back on failure" fired immediately: forced redeploy to
+  the previous task definition (`devops-g2-pos:13`), then its own
+  `aws ecs wait services-stable` call.
+- 23:58:34Z — that second wait **also** timed out: `aws: [ERROR]: Waiter
+  ServicesStable failed: Max attempts exceeded`. 36 minutes total elapsed,
+  and the workflow ended in failure with no confirmed-good signal from
+  either wait.
+- A manual `describe-services` check shortly after showed the service was in
+  fact fine: `status: ACTIVE`, `running: 1/1`, one `PRIMARY` deployment on
+  `devops-g2-pos:13`, `rolloutState: COMPLETED`, `failedTasks: 0`. The
+  rollback had actually succeeded; the wait's own timeout window was just
+  shorter than how long ECS needed to fully converge and report stable.
+
+Two separate findings, not one:
+
+1. **The 30-minute RTO target was missed.** Even taking the optimistic
+   reading (rollback substantively done by ~23:48–23:58Z), total time from
+   deploy start to a confirmed-good service is in the same range as, or
+   past, the 30-minute target — not comfortably under it. `pos-service.tf`
+   has no `deployment_circuit_breaker` configured, so nothing on the AWS
+   side self-detects and reverts a bad rollout; the GitHub Actions
+   workflow's own wait is the only thing watching, and it is slow to give up
+   (default waiter: ~10 minutes) on an already-slow ECS/ALB convergence.
+2. **The workflow's rollback confirmation is a false negative, not a real
+   failure.** `aws ecs wait services-stable`'s default polling budget is
+   too short for this stack's actual convergence time. The workflow reports
+   "rollback failed" via `exit 1` even when the rollback fully succeeded,
+   which would train whoever's on call to distrust or double-check a signal
+   that is actually reliable in the one way that matters (did the task
+   definition change apply) and unreliable in the other (did the wait
+   notice in time).
+
+Lesson: this is executed, timed evidence for drill 4 — but timed *over*
+budget, so it does not count as a passing drill. Fix candidates worth
+weighing before the next attempt: add `deployment_circuit_breaker` with
+`rollback = true` on both services (moves the self-heal into AWS instead of
+depending on the workflow noticing), and/or increase or replace the
+`aws ecs wait services-stable` timeout so a true rollback success is
+reported as one.
