@@ -44,6 +44,15 @@ jobs:
       - name: Terraform init
         run: terraform init
 
+      # The canary in synthetics.tf is gated on this var (empty = disabled);
+      # read it from the gateway's own output rather than hardcoding the
+      # invoke URL, so it stays correct if the gateway is ever recreated.
+      # Falls back to empty (probe stays off) if the output doesn't exist yet
+      # — e.g. a fresh account applying before the API Gateway branch has run.
+      - name: Read API Gateway invoke URL for the synthetic probe
+        run: |
+          echo "TF_VAR_synthetic_probe_url=$(terraform output -raw api_gateway_invoke_url 2>/dev/null || echo '')" >> "$GITHUB_ENV"
+
       - name: Terraform plan
         env:
           TF_VAR_service_auth_secret_value: ${{ secrets.TF_VAR_SERVICE_AUTH_SECRET_VALUE }}
@@ -97,6 +106,13 @@ jobs:
 
       - name: Terraform init
         run: terraform init
+
+      # Kept in parity with the plan job's step, even though a saved-plan
+      # apply doesn't re-evaluate this variable — see that job for why it's
+      # read from state rather than hardcoded.
+      - name: Read API Gateway invoke URL for the synthetic probe
+        run: |
+          echo "TF_VAR_synthetic_probe_url=$(terraform output -raw api_gateway_invoke_url 2>/dev/null || echo '')" >> "$GITHUB_ENV"
 
       - name: Download plan
         uses: actions/download-artifact@v4
