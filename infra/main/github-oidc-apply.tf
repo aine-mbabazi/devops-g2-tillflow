@@ -200,6 +200,19 @@ data "aws_iam_policy_document" "github_apply_permissions" {
     resources = ["arn:aws:scheduler:us-east-2:${local.account_id}:schedule/default/${local.name_prefix}-*"]
   }
 
+  # Classic EventBridge (events:*), distinct from EventBridge Scheduler
+  # (scheduler:*) above — Commission uses the newer Scheduler service, so
+  # nothing in this policy had ever touched events:* until the probe's
+  # aws_cloudwatch_event_rule/_target. First failed on events:TagResource;
+  # scoped wildcard here rather than itemizing one call at a time, matching
+  # this file's existing pattern for SNS/Lambda/Scheduler.
+  statement {
+    sid       = "ProbeSchedule"
+    effect    = "Allow"
+    actions   = ["events:*"]
+    resources = ["arn:aws:events:us-east-2:${local.account_id}:rule/${local.name_prefix}-*"]
+  }
+
   # RDS was never in this policy at all, which means the live database was
   # applied out of band rather than by this pipeline. Adding it so a
   # destroy/rebuild is actually reproducible from CI.

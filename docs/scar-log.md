@@ -324,3 +324,24 @@ system never needed — its checks are JSON API responses, not rendered pages.
   it. Repointing the probe's metric required editing both the CloudWatch
   dashboard and the Grafana JSON in the same change; neither would have failed
   a plan, they would just have rendered blank.
+
+## 2026-09-21 — The scheduled-Lambda probe hit one more sixth: events:TagResource
+
+PR #81's own apply (destroying the canary and its bucket, creating the
+Lambda, all clean) died on the very last resource:
+`aws_cloudwatch_event_rule.probe` — `AccessDenied: ... not authorized to
+perform: events:TagResource`.
+
+Same shape as every permission gap tonight, one detail different: this
+wasn't a narrow miss on a service already in the policy, it was the first
+time this policy had ever needed classic EventBridge (`events:*`) at all.
+Commission's schedule uses the newer EventBridge *Scheduler* service
+(`scheduler:*`, a separate statement, separate ARN namespace) — nothing
+before the probe had exercised `events:*`.
+
+Fixed with a scoped wildcard (`events:*` on `rule/devops-g2-*`), matching
+this file's existing pattern for SNS/Lambda/Scheduler — a service this role
+manages entirely for itself, resource-scoped to the group prefix, rather
+than itemizing one `events:` action at a time the way `GroupScopedBuckets`
+and `GroupScopedIAM` do for the two services where a wildcard would actually
+be dangerous.
