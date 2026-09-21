@@ -23,7 +23,7 @@
       "version": "1.0.0"
     }
   ],
-  "title": "TillFlow — SLO & service health",
+  "title": "TillFlow \u2014 SLO & service health",
   "uid": "tillflow-slo",
   "description": "Reliability + operations dashboard. Panel order follows the question order of an incident: is it up, how much budget is left, how fast is it burning, then RED, saturation, and finally whether the product is actually working. Owned by @mercykilonzo; see docs/runbook.md.",
   "tags": [
@@ -159,7 +159,7 @@
     {
       "id": 1,
       "type": "stat",
-      "title": "Uptime — 5 minutes",
+      "title": "Uptime \u2014 5 minutes",
       "description": "External synthetic probe success rate over the last 5 minutes. This is the 'is it up right now' number.",
       "datasource": {
         "type": "cloudwatch",
@@ -209,10 +209,10 @@
       "targets": [
         {
           "refId": "A",
-          "namespace": "CloudWatchSynthetics",
+          "namespace": "TillFlow/synthetics",
           "metricName": "SuccessPercent",
           "dimensions": {
-            "CanaryName": "devops-g2-probe"
+            "ProbeName": "devops-g2-probe"
           },
           "statistic": "Average",
           "period": "300",
@@ -223,7 +223,7 @@
     {
       "id": 2,
       "type": "stat",
-      "title": "Uptime — 1 hour",
+      "title": "Uptime \u2014 1 hour",
       "description": "Same probe, one-hour window. Smooths a single failed run so a transient blip does not read as an outage.",
       "datasource": {
         "type": "cloudwatch",
@@ -271,10 +271,10 @@
       "targets": [
         {
           "refId": "A",
-          "namespace": "CloudWatchSynthetics",
+          "namespace": "TillFlow/synthetics",
           "metricName": "SuccessPercent",
           "dimensions": {
-            "CanaryName": "devops-g2-probe"
+            "ProbeName": "devops-g2-probe"
           },
           "statistic": "Average",
           "period": "3600",
@@ -285,8 +285,8 @@
     {
       "id": 3,
       "type": "stat",
-      "title": "Uptime — 28 days",
-      "description": "The SLO window itself. This is the number the reliability contract in docs/slo-error-budgets.md is actually written against — the two above are for triage, this one is for the commitment.",
+      "title": "Uptime \u2014 28 days",
+      "description": "The SLO window itself. This is the number the reliability contract in docs/slo-error-budgets.md is actually written against \u2014 the two above are for triage, this one is for the commitment.",
       "datasource": {
         "type": "cloudwatch",
         "uid": "${DS_CLOUDWATCH}"
@@ -335,10 +335,10 @@
       "targets": [
         {
           "refId": "A",
-          "namespace": "CloudWatchSynthetics",
+          "namespace": "TillFlow/synthetics",
           "metricName": "SuccessPercent",
           "dimensions": {
-            "CanaryName": "devops-g2-probe"
+            "ProbeName": "devops-g2-probe"
           },
           "statistic": "Average",
           "period": "3600",
@@ -350,7 +350,7 @@
       "id": 4,
       "type": "gauge",
       "title": "POS error budget remaining (28d)",
-      "description": "100 × (1 − consumed ÷ allowed), where allowed = 0.1% of eligible requests over 28 days (40m 19s). Below 0 the budget is overspent and the release freeze in docs/slo-error-budgets.md applies.",
+      "description": "100 \u00d7 (1 \u2212 consumed \u00f7 allowed), where allowed = 0.1% of eligible requests over 28 days (40m 19s). Below 0 the budget is overspent and the release freeze in docs/slo-error-budgets.md applies.",
       "datasource": {
         "type": "cloudwatch",
         "uid": "${DS_CLOUDWATCH}"
@@ -428,7 +428,7 @@
     {
       "id": 5,
       "type": "timeseries",
-      "title": "POS burn rate (× sustainable)",
+      "title": "POS burn rate (\u00d7 sustainable)",
       "description": "1.0 means the 28-day budget is consumed in exactly 28 days. The two threshold lines are the same values the devops-g2-pos-budget-fast-burn and -slow-burn alarms use, so this panel and the page can never disagree.",
       "datasource": {
         "type": "cloudwatch",
@@ -565,7 +565,7 @@
     },
     {
       "type": "row",
-      "title": "RED — rate, errors, duration",
+      "title": "RED \u2014 rate, errors, duration",
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -577,7 +577,7 @@
     {
       "id": 7,
       "type": "timeseries",
-      "title": "Rate — requests/min",
+      "title": "Rate \u2014 requests/min",
       "datasource": {
         "type": "cloudwatch",
         "uid": "${DS_CLOUDWATCH}"
@@ -628,8 +628,8 @@
     {
       "id": 8,
       "type": "timeseries",
-      "title": "Errors — 5xx/min",
-      "description": "Target 5xx is the service failing. ELB 5xx with no target 5xx means the load balancer had no healthy target to send to — a different incident with a different first action.",
+      "title": "Errors \u2014 5xx/min",
+      "description": "Target 5xx is the service failing. ELB 5xx with no target 5xx means the load balancer had no healthy target to send to \u2014 a different incident with a different first action.",
       "datasource": {
         "type": "cloudwatch",
         "uid": "${DS_CLOUDWATCH}"
@@ -692,7 +692,7 @@
     {
       "id": 9,
       "type": "timeseries",
-      "title": "Duration — p95 latency",
+      "title": "Duration \u2014 p95 latency",
       "datasource": {
         "type": "cloudwatch",
         "uid": "${DS_CLOUDWATCH}"
@@ -870,7 +870,7 @@
     {
       "id": 11,
       "type": "timeseries",
-      "title": "RDS — CPU and connections",
+      "title": "RDS \u2014 CPU and connections",
       "description": "One db.t4g.micro is shared by POS, Payments and Commission. It is the first place to look when two services degrade at once.",
       "datasource": {
         "type": "cloudwatch",
@@ -933,7 +933,7 @@
       "id": 12,
       "type": "timeseries",
       "title": "Sales recorded vs payments dispatched",
-      "description": "These two lines should track each other. A sustained gap means sales are being recorded that never reach Payments — a product failure every panel above reports as healthy.",
+      "description": "These two lines should track each other. A sustained gap means sales are being recorded that never reach Payments \u2014 a product failure every panel above reports as healthy.",
       "datasource": {
         "type": "cloudwatch",
         "uid": "${DS_CLOUDWATCH}"
@@ -978,7 +978,7 @@
     {
       "id": 13,
       "type": "timeseries",
-      "title": "Money-correctness invariants — any non-zero value is an incident",
+      "title": "Money-correctness invariants \u2014 any non-zero value is an incident",
       "description": "Callback conflicts, reconcile mismatches and failed daily closes. None of these produce a 5xx, so none of them appear anywhere else on this dashboard.",
       "datasource": {
         "type": "cloudwatch",
@@ -1048,7 +1048,7 @@
       "id": 14,
       "type": "timeseries",
       "title": "Commission payouts per daily close",
-      "description": "Counts attendants actually disbursed, not runs executed — one close covers every attendant in a tenant.",
+      "description": "Counts attendants actually disbursed, not runs executed \u2014 one close covers every attendant in a tenant.",
       "datasource": {
         "type": "cloudwatch",
         "uid": "${DS_CLOUDWATCH}"

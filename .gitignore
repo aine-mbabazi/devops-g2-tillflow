@@ -14,9 +14,3 @@ node_modules/
 # Terraform packages the Slack notifier and the synthetic probe from source at
 # plan time; the zips are build output, not source.
 infra/main/.build/
-
-# CloudWatch Synthetics requires the canary handler to sit at
-# nodejs/node_modules/<handler>.js inside the zip. That path is source, not an
-# installed dependency, so it is re-included against the node_modules rule above.
-!infra/main/canary/nodejs/node_modules/
-!infra/main/canary/nodejs/node_modules/**

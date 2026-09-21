@@ -103,7 +103,7 @@ resource "aws_cloudwatch_dashboard" "slo" {
           # a short outage is visible without hiding the long-run trend.
           metrics = [
             [{ expression = "AVG(m1)", label = "uptime %", id = "e1" }],
-            ["CloudWatchSynthetics", "SuccessPercent", "CanaryName", "${local.name_prefix}-probe", { id = "m1", visible = false }],
+            ["TillFlow/synthetics", "SuccessPercent", "ProbeName", "${local.name_prefix}-probe", { id = "m1", visible = false }],
           ]
           yAxis  = { left = { min = 95, max = 100 } }
           period = 300
