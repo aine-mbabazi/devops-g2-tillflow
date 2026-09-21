@@ -171,7 +171,18 @@ resource "aws_synthetics_canary" "probe" {
 
   run_config {
     timeout_in_seconds = 30
-    memory_in_mb       = 960
+    # 512, not the 960 the Synthetics docs use as a floor, because this account
+    # caps Lambda memory at 512 MB:
+    #
+    #   CREATE_FAILED: 'MemorySize' value failed to satisfy constraint:
+    #   Member must have value less than or equal to 512
+    #
+    # The canary runs on the puppeteer runtime but never launches Chromium —
+    # probe.js is a plain fetch script and never calls getPage() — so the heavy
+    # part of that runtime is never paid for. If the canary starts timing out or
+    # dying at runtime, this is the first thing to suspect, and the real fix is
+    # a Lambda memory quota increase rather than a smaller probe.
+    memory_in_mb = 512
     environment_variables = {
       PROBE_BASE_URL = local.probe_base_url
     }
