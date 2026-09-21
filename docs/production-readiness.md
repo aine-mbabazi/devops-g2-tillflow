@@ -86,8 +86,9 @@ reason the verdict above is what it is.
 
 Alarms, dashboards, the alert path and the synthetic probe all exist in
 Terraform. **None has ever fired, because nothing has been applied.** No Slack
-message has been delivered, the probe has never run, and the Grafana dashboard
-has never been rendered — no Grafana instance exists.
+message has been delivered, the probe has never run, and Grafana — now
+provisioned on Fargate with its dashboard loaded from the repo — has never been
+rendered.
 
 Until one apply succeeds, the operational posture is "we believe we would find
 out", which is not the same as knowing.

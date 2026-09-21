@@ -1,0 +1,16 @@
+# Provisioned at container start. The datasource has a fixed uid so the
+# dashboard JSON can reference it without the __inputs prompt that a manual
+# import uses — a provisioned dashboard is never "imported", so nothing would
+# ever answer that prompt.
+apiVersion: 1
+
+datasources:
+  - name: CloudWatch
+    uid: cloudwatch-tillflow
+    type: cloudwatch
+    access: proxy
+    isDefault: true
+    editable: false
+    jsonData:
+      authType: default    # the ECS task role — no keys anywhere
+      defaultRegion: us-east-2

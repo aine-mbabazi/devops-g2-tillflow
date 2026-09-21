@@ -112,9 +112,10 @@ holds no ongoing cost beyond negligible S3/DynamoDB storage.
   (resolve `<account-id>` with `aws sts get-caller-identity --query Account --output text`)
 - **CloudWatch Logs:** `/devops-g2/payments`, `/devops-g2/pos`, `/devops-g2/commission`
 - **SLO dashboard:** the `slo_dashboard_url` Terraform output (CloudWatch).
-  The Grafana equivalent is committed at
-  [`observability/grafana/tillflow-slo-dashboard.json`](observability/grafana/tillflow-slo-dashboard.json)
-  and imports against a CloudWatch datasource.
+  The same panels render in Grafana at `<api-gateway-invoke-url>/grafana/`,
+  provisioned from
+  [`observability/grafana/`](observability/grafana/) at container start.
+  Admin credentials are in the `devops-g2/grafana-admin` secret.
 
 ## Caching and async
 

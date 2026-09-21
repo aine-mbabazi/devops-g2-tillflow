@@ -1,0 +1,17 @@
+# Loads every dashboard JSON sitting beside this file. allowUiUpdates is false
+# so the rendered dashboard cannot drift from the one in the repo: if someone
+# edits a panel in the UI, the next task restart discards it. The repo is the
+# source of truth, which is the whole point of provisioning it.
+apiVersion: 1
+
+providers:
+  - name: tillflow
+    orgId: 1
+    folder: TillFlow
+    type: file
+    disableDeletion: false
+    allowUiUpdates: false
+    updateIntervalSeconds: 60
+    options:
+      path: /etc/grafana/provisioning/dashboards
+      foldersFromFilesStructure: false

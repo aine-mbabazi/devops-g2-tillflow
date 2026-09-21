@@ -356,9 +356,13 @@ explanation and these are the places where neither yet exists.
 - **The probe has never run.** It stays unprovisioned until
   `synthetic_probe_url` is set, which needs the API Gateway branch merged and
   applied first.
-- **The Grafana dashboard has not been rendered.** No Grafana instance exists.
-  The JSON is committed and its queries mirror the CloudWatch dashboard's, but
-  "imports cleanly" is an untested claim. Its ALB dimensions resolve through
+- **Grafana is provisioned but not yet verified running.** `infra/main/grafana.tf`
+  runs Grafana on Fargate behind the ALB at `/grafana`, with the CloudWatch
+  datasource and this dashboard provisioned from the repo at container start —
+  so it survives a destroy/rebuild rather than living in someone's browser. The
+  dashboard transform is proven locally (18 panels, every `${DS_CLOUDWATCH}`
+  placeholder resolved to the provisioned datasource uid), but **no apply has
+  run**, so "it renders" is still an untested claim. Its ALB dimensions resolve through
   template variables at import rather than hardcoded values, precisely because
   the `arn_suffix` is not knowable at commit time.
 - **`smoke.js` has now run against the live deployed stack and passed** —
