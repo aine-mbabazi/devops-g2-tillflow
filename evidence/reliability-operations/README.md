@@ -350,9 +350,30 @@ explanation and these are the places where neither yet exists.
   point-in-time restore completed in 35m 21s, exceeding the stated 30-minute
   RTO target. The required post-restore provider-reference reconciliation was
   not captured, so Drill 5 cannot be recorded as passing.
-- **RTO and RPO are asserted, not measured.** The 30-minute and 5-minute figures
-  are design intent derived from how the mechanisms work. Only the restore drill
-  converts them into evidence.
+- **RTO is measured, and missed. RPO is still unmeasured.** These are no longer
+  the same claim, and an earlier revision of this file wrongly said both were
+  "asserted, not measured" while listing two drills above that had already timed
+  RTO.
+
+  Three timings exist, against a 30-minute target:
+
+  | Drill | Scenario | Measured | vs 30-min RTO |
+  |---|---|---|---|
+  | 3 | Payments task killed, ECS replaces it | 7m 23s | within |
+  | 4 | Broken release, smoke fails, rollback | 30–36 min | **at or over** |
+  | 5 | RDS point-in-time restore | 35m 21s | **over** |
+
+  So recovery from losing a *task* is comfortable; recovery from a bad release
+  or a database restore is not. (Drills 1 and 2 also ran, but against a local
+  stack rather than the deployed one, so they time nothing useful for RTO.) The 30-minute figure is not achievable today for
+  the two scenarios that actually threaten data or a deploy, and it should
+  either be revised upward with a rationale or the recovery path made faster —
+  not left as a target that two of three drills missed.
+
+  **RPO (5 minutes) remains design intent.** No drill measured data loss: drill
+  5 timed how long a restore takes, not how much was lost. Measuring it needs a
+  restore to a known point with writes either side of it, which has not been
+  done.
 - **The probe runs, but has not been confirmed publishing.** The
   Synthetics-canary deadlock described in earlier revisions of this file is
   resolved and no longer applies: the canary was removed and replaced with an
