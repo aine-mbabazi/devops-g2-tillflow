@@ -127,6 +127,28 @@
         "includeAll": false,
         "multi": false,
         "hide": 0
+      },
+      {
+        "name": "web_tg",
+        "label": "Web target group",
+        "type": "query",
+        "datasource": {
+          "type": "cloudwatch",
+          "uid": "${DS_CLOUDWATCH}"
+        },
+        "query": {
+          "queryType": "dimensionValues",
+          "region": "$region",
+          "namespace": "AWS/ApplicationELB",
+          "metricName": "RequestCount",
+          "dimensionKey": "TargetGroup",
+          "dimensionFilters": {}
+        },
+        "regex": "/.*web-tg.*/",
+        "refresh": 1,
+        "includeAll": false,
+        "multi": false,
+        "hide": 0
       }
     ]
   },
@@ -622,6 +644,18 @@
           "period": "60",
           "label": "Payments",
           "region": "$region"
+        },
+        {
+          "refId": "W",
+          "namespace": "AWS/ApplicationELB",
+          "metricName": "RequestCount",
+          "dimensions": {
+            "TargetGroup": "$web_tg"
+          },
+          "statistic": "Sum",
+          "period": "60",
+          "label": "Web",
+          "region": "$region"
         }
       ]
     },
@@ -685,6 +719,18 @@
           "statistic": "Sum",
           "period": "60",
           "label": "ALB 5xx (no healthy target)",
+          "region": "$region"
+        },
+        {
+          "refId": "W",
+          "namespace": "AWS/ApplicationELB",
+          "metricName": "HTTPCode_Target_5XX_Count",
+          "dimensions": {
+            "TargetGroup": "$web_tg"
+          },
+          "statistic": "Sum",
+          "period": "60",
+          "label": "Web 5xx",
           "region": "$region"
         }
       ]
@@ -753,6 +799,18 @@
           "statistic": "p95",
           "period": "60",
           "label": "Payments p95",
+          "region": "$region"
+        },
+        {
+          "refId": "W",
+          "namespace": "AWS/ApplicationELB",
+          "metricName": "TargetResponseTime",
+          "dimensions": {
+            "TargetGroup": "$web_tg"
+          },
+          "statistic": "p95",
+          "period": "60",
+          "label": "Web p95",
           "region": "$region"
         }
       ]

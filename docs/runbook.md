@@ -22,6 +22,8 @@ twice. If you are unsure, leave it pending and escalate.
   [POS 5xx](#pos-5xx) ·
   [Payments 5xx](#payments-5xx) ·
   [POS latency p95](#pos-latency-p95) ·
+  [Web 5xx](#web-5xx) ·
+  [Web latency p95](#web-latency-p95) ·
   [Budget fast burn](#budget-fast-burn) ·
   [Budget slow burn](#budget-slow-burn) ·
   [Payments callback lag](#payments-callback-lag) ·
@@ -157,6 +159,39 @@ costs real money when it is.
    `SERVICE_AUTH_SECRET` or `DATABASE_URL`) presents as a task that starts and
    immediately exits.
 4. If the last deploy is recent, [roll back](#rollback-vs-roll-forward).
+
+---
+
+## Web 5xx
+
+**Symptom:** The web API shell is returning 5xx to browsers.
+**Impact:** The product is unusable from the front end even when POS and
+Payments are healthy. Burns the Web 99.9% budget.
+
+1. `aws ecs describe-services --cluster devops-g2 --services devops-g2-web` —
+   events first, as always.
+2. **Check POS before assuming Web is at fault.** The shell proxies to POS, so
+   a POS outage surfaces here as well as on its own alarm. If
+   `devops-g2-pos-5xx` is also firing, Web is the symptom and POS is the cause.
+3. Check `/devops-g2/web` for `startup_error` — a config validation failure
+   presents as a task that starts and immediately exits.
+4. If the last deploy is recent, [roll back](#rollback-vs-roll-forward).
+
+---
+
+## Web latency p95
+
+**Symptom:** Web p95 latency is above its 500 ms SLO target.
+**Impact:** The product feels slow in the browser. The latency half of the Web
+SLI is breached.
+
+1. Compare against the POS latency panel first. The shell proxies to POS, so
+   POS latency appears here amplified — one round trip of its own plus the one
+   it is waiting on — rather than as a separate fault.
+2. If POS p95 is healthy and Web's is not, the added time is in the shell
+   itself; check ECS CPU and memory for `devops-g2-web`.
+3. Do not scale Web to fix latency that originates in POS. It adds callers to
+   the same bottleneck.
 
 ---
 

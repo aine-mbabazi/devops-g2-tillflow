@@ -28,6 +28,18 @@ locals {
       impact       = "STK pushes and B2C payouts are being rejected. A sale can still be recorded but cannot be paid. Burns the Payments 99.5% budget."
       first_action = "Check /devops-g2/payments for provider_dispatch_unconfirmed. Do NOT retry payouts by hand — reconciliation resolves pending state, a manual retry risks a double disbursement."
     }
+    # Web arrived after this alerting was written and was never added to it, so
+    # docs/slo-error-budgets.md committed Web to 99.9% while nothing watched it
+    # — a published SLO with no instrumentation behind it, which is worse than
+    # having neither.
+    web = {
+      target_group = aws_lb_target_group.web.arn_suffix
+      owner        = "@aine-mbabazi"
+      runbook      = "#web-5xx"
+      symptom      = "The web API shell is returning 5xx to browsers."
+      impact       = "The product is unusable from the front end even when POS and Payments are healthy. Burns the Web 99.9% budget (40m 19s per 28 days)."
+      first_action = "Check ECS service events for devops-g2-web, then confirm POS is healthy — the shell proxies to it, so a POS outage surfaces here as well as on its own alarm."
+    }
   }
 }
 
@@ -114,6 +126,40 @@ resource "aws_cloudwatch_metric_alarm" "pos_latency" {
   ok_actions    = [aws_sns_topic.alerts.arn]
 
   tags = merge(local.common_tags, { service = "pos" })
+}
+
+resource "aws_cloudwatch_metric_alarm" "web_latency" {
+  alarm_name          = "${local.name_prefix}-web-latency-p95"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 3
+  datapoints_to_alarm = 2
+  threshold           = 0.5 # seconds — the Web SLO's p95 < 500 ms
+  period              = 300
+  extended_statistic  = "p95"
+  namespace           = "AWS/ApplicationELB"
+  metric_name         = "TargetResponseTime"
+  treat_missing_data  = "notBreaching"
+
+  dimensions = {
+    LoadBalancer = aws_lb.main.arn_suffix
+    TargetGroup  = aws_lb_target_group.web.arn_suffix
+  }
+
+  alarm_description = jsonencode({
+    service      = "web"
+    owner        = "@mercykilonzo"
+    symptom      = "Web p95 latency is above its 500 ms SLO target."
+    impact       = "The product feels slow in the browser. Not yet failing, but the latency half of the Web SLI is breached."
+    unit         = "seconds (p95)"
+    panel        = ""
+    runbook      = "#web-latency-p95"
+    first_action = "Compare against the POS latency panel first — the shell proxies to POS, so POS latency shows up here amplified rather than as a separate fault."
+  })
+
+  alarm_actions = [aws_sns_topic.alerts.arn]
+  ok_actions    = [aws_sns_topic.alerts.arn]
+
+  tags = merge(local.common_tags, { service = "web" })
 }
 
 # ---------------------------------------------------------------------------

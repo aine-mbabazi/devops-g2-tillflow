@@ -171,6 +171,7 @@ resource "aws_cloudwatch_dashboard" "slo" {
           metrics = [
             ["AWS/ApplicationELB", "RequestCount", "LoadBalancer", aws_lb.main.arn_suffix, "TargetGroup", aws_lb_target_group.pos.arn_suffix, { label = "POS", stat = "Sum" }],
             ["...", aws_lb_target_group.payments.arn_suffix, { label = "Payments", stat = "Sum" }],
+            ["...", aws_lb_target_group.web.arn_suffix, { label = "Web", stat = "Sum" }],
           ]
           period = 60
         }
@@ -185,6 +186,7 @@ resource "aws_cloudwatch_dashboard" "slo" {
           metrics = [
             ["AWS/ApplicationELB", "HTTPCode_Target_5XX_Count", "LoadBalancer", aws_lb.main.arn_suffix, "TargetGroup", aws_lb_target_group.pos.arn_suffix, { label = "POS 5xx", stat = "Sum" }],
             ["...", aws_lb_target_group.payments.arn_suffix, { label = "Payments 5xx", stat = "Sum" }],
+            ["...", aws_lb_target_group.web.arn_suffix, { label = "Web 5xx", stat = "Sum" }],
             ["AWS/ApplicationELB", "HTTPCode_ELB_5XX_Count", "LoadBalancer", aws_lb.main.arn_suffix, { label = "ALB 5xx (no healthy target)", stat = "Sum" }],
           ]
           period = 60
@@ -199,6 +201,7 @@ resource "aws_cloudwatch_dashboard" "slo" {
           metrics = [
             ["AWS/ApplicationELB", "TargetResponseTime", "LoadBalancer", aws_lb.main.arn_suffix, "TargetGroup", aws_lb_target_group.pos.arn_suffix, { label = "POS p95", stat = "p95" }],
             ["...", aws_lb_target_group.payments.arn_suffix, { label = "Payments p95", stat = "p95" }],
+            ["...", aws_lb_target_group.web.arn_suffix, { label = "Web p95 (SLO 500ms)", stat = "p95" }],
           ]
           period = 60
           annotations = {

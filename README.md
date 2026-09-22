@@ -23,10 +23,15 @@ See [`docs/ownership.md`](docs/ownership.md) for the full DRI matrix.
 
 | Area | DRI |
 |------|-----|
-| Product + POS | @aine-mbabazi |
-| Payments + integrity | @cheshari-pearl |
+| Product + POS + Web | @aine-mbabazi |
 | Platform + delivery | @aine-mbabazi |
-| Reliability + operations | @cheshari-pearl |
+| Payments + integrity + Commission | @cheshari-pearl |
+| Reliability + operations | @mercykilonzo |
+| CI/CD + golden path | @mercykilonzo |
+
+This table is a summary of [`docs/ownership.md`](docs/ownership.md), which is
+the source of truth along with `CODEOWNERS`. If the three ever disagree,
+`CODEOWNERS` is what actually gates review, and this table is the bug.
 
 ## Architecture
 
@@ -262,7 +267,7 @@ probe all bill continuously while running.
 - [`docs/architecture.md`](docs/architecture.md) — system architecture
 - [`docs/payment-contract.md`](docs/payment-contract.md) — proposed POS → Payments contract for G0 review
 - [`docs/commission-payout-contract.md`](docs/commission-payout-contract.md) — proposed Commission → Payments B2C contract for G0 review
-- [`docs/adr/`](docs/adr/) — architecture decision records, including [0004 — caching and queueing](docs/adr/0004-caching-and-queueing.md)
+- [`docs/adr/`](docs/adr/) — architecture decision records, including [0004 — caching and queueing](docs/adr/0004-caching-and-queueing.md) and [0005 — why the CodePipeline lane is not built](docs/adr/0005-no-codepipeline-lane.md)
 - [`docs/threat-model.md`](docs/threat-model.md) — threat model
 - [`docs/production-readiness.md`](docs/production-readiness.md) — production readiness review: what is solid, what would stop a real launch, and in what order to fix it
 - [`docs/slo-error-budgets.md`](docs/slo-error-budgets.md) — SLOs and error budgets

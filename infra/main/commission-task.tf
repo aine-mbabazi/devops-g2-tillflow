@@ -97,7 +97,19 @@ resource "aws_ecs_task_definition" "commission" {
 resource "aws_scheduler_schedule" "commission_daily" {
   name        = "${local.name_prefix}-commission-daily"
   description = "Commission daily close, once per day at 02:00 UTC (05:00 EAT)"
-  state       = "DISABLED" # enable after the first image is pushed to ECR
+  # Enabled 2026-09-22. The precondition in the original comment — "enable
+  # after the first image is pushed to ECR" — was met on 2026-09-20, when
+  # Release Commission succeeded twice, but the flag was never flipped. While
+  # it stayed DISABLED the daily close never ran on schedule, which made the
+  # Commission SLI ("eligible payouts reach terminal state by 06:30 EAT")
+  # unmeasurable and devops-g2-commission-close-failed unable to fire: a close
+  # that never starts never fails.
+  #
+  # Enabling this starts a real daily B2C close against the Daraja sandbox at
+  # 02:00 UTC / 05:00 EAT. A re-run is safe — the commissionRunId derives from
+  # the UTC date, so retries reuse the same idempotency keys and cannot
+  # double-pay — but the first scheduled run is worth watching.
+  state = "ENABLED"
 
   schedule_expression          = "cron(0 2 * * ? *)"
   schedule_expression_timezone = "UTC"

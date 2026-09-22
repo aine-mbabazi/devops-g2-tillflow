@@ -146,6 +146,19 @@ data "aws_iam_policy_document" "github_actions_permissions" {
       "ecr:GetRegistryScanningConfiguration",
       "synthetics:GetCanary",
       "synthetics:ListTagsForResource",
+      # The probe's EventBridge rule and target. #84 granted the APPLY role
+      # events:* so the rule could be created; the PLAN role was not given the
+      # matching reads, so every plan after that apply fails refreshing a
+      # resource it now owns — which is what happened, on every open PR at
+      # once, including docs-only ones that touch no Terraform at all.
+      #
+      # This is the same trap called out in #49: a resource absent from state
+      # needs no API read, so the first apply passes without these and the
+      # pipeline only breaks on the NEXT commit. Grant read at the same time as
+      # write, not after the failure.
+      "events:DescribeRule",
+      "events:ListTargetsByRule",
+      "events:ListTagsForResource",
       "ec2:Describe*",
       "ecs:Describe*",
       "ecs:List*",

@@ -20,7 +20,7 @@ the gap between those two is written down below rather than glossed.
 | CI/CD and golden path | Good — PR checks, scans, SBOM, digest-pinned deploys, post-deploy smoke + rollback | No |
 | Observability | Wired but unproven — alarms, dashboards and probe exist in code, none has ever fired | **Yes** |
 | Availability | `desired_count = 1`, single-AZ RDS, single NAT | **Yes** |
-| Recovery | Documented, never rehearsed | **Yes** |
+| Recovery | All 5 drills executed, none a clean pass; RTO missed in 2 of 3 timings | **Yes** |
 | Security | Good baseline; gaps in transport and authz named below | **Yes** |
 
 ---
@@ -58,15 +58,36 @@ Registry-level enhanced scanning re-evaluates images as new CVEs land.
 
 ## What would stop a real launch
 
-### 1. No failure has ever been rehearsed
+### 1. Recovery is rehearsed, and misses its objective
 
-Every recovery procedure in [`runbook.md`](runbook.md) is written and none has
-been executed. All five game-day drills are specified with falsifiable
-hypotheses; zero have run.
+All five game-day drills have now been executed. This section previously said
+none had; that was true when written and is not true now. None is a clean pass
+— drills 1 and 2 ran against a local stack rather than the deployed one, and
+the three below each fell short for their own reason.
 
-**RTO (30 min) and RPO (5 min) are design intent, not measurements.** They are
-derived from how the mechanisms work, not from a timed restore. A recovery
-objective nobody has timed is a guess with a number attached.
+| Drill | Scenario | Measured | vs 30-min RTO |
+|---|---|---|---|
+| 3 | Payments task killed, ECS replaces it | 7m 23s | within |
+| 4 | Broken release, smoke fails, rollback engages | 30–36 min | **at or over** |
+| 5 | RDS point-in-time restore | 35m 21s | **over** |
+
+**RTO is therefore measured, and missed in two of three scenarios.** Recovery
+from losing a task is comfortable. Recovery from a bad release or a database
+restore is not, and those are the two that threaten a deploy or the data.
+
+This is a result, not a paperwork gap. The honest options are to revise the
+30-minute target upward with a written rationale, or to make the restore and
+rollback paths faster. Leaving a target that two of three drills missed is the
+one option that is not defensible.
+
+Neither drill 4 nor drill 5 is a full pass for a second reason: drill 4's
+alarm/Slack capture and drill 5's post-restore provider-reference
+reconciliation were both skipped. Drill 3 likewise executed without capturing
+its alarm.
+
+**RPO (5 min) is still design intent.** No drill measured data loss — drill 5
+timed how long a restore takes, not how much was lost. Measuring it needs a
+restore to a known point with writes either side, which has not been done.
 
 ### 2. Single points of failure, by choice
 
@@ -128,8 +149,16 @@ out", which is not the same as knowing.
 
 ## If this were going live, in order
 
-1. **Run the five game-day drills** and record measured RTO/RPO. Everything
-   else on this list is a guess until this happens.
+1. **Settle the RTO target, and close out the drills.** All five have been
+   executed, but none is a clean pass: drills 1 and 2 ran against a local stack
+   rather than the deployed one, drill 3 did not capture its alarm, drill 4
+   exceeded RTO, and drill 5 skipped the post-restore reconciliation.
+
+   The substantive problem is RTO: measured and missed in two of three timings
+   (30–36 min and 35m 21s against a 30-minute target). Either the target moves
+   with a written rationale, or the rollback and restore paths get faster.
+   RPO is still unmeasured; that needs a restore to a known point with writes
+   either side.
 2. **`desired_count = 2`.** Cheapest real availability win available.
 3. **Apply, and confirm one alert round-trips to Slack** — firing and recovery.
 4. **TLS end to end**, or an explicit written acceptance of plaintext inside
