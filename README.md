@@ -23,10 +23,15 @@ See [`docs/ownership.md`](docs/ownership.md) for the full DRI matrix.
 
 | Area | DRI |
 |------|-----|
-| Product + POS | @aine-mbabazi |
-| Payments + integrity | @cheshari-pearl |
+| Product + POS + Web | @aine-mbabazi |
 | Platform + delivery | @aine-mbabazi |
-| Reliability + operations | @cheshari-pearl |
+| Payments + integrity + Commission | @cheshari-pearl |
+| Reliability + operations | @mercykilonzo |
+| CI/CD + golden path | @mercykilonzo |
+
+This table is a summary of [`docs/ownership.md`](docs/ownership.md), which is
+the source of truth along with `CODEOWNERS`. If the three ever disagree,
+`CODEOWNERS` is what actually gates review, and this table is the bug.
 
 ## Architecture
 
