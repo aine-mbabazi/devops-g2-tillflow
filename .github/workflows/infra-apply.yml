@@ -7,6 +7,14 @@ on:
       - 'infra/main/**'
       - '.github/workflows/infra-apply.yml'
   workflow_dispatch:
+    inputs:
+      target:
+        description: >-
+          Break-glass only. A Terraform resource address to limit this run to,
+          e.g. aws_iam_role_policy.github_actions. Leave blank for a normal
+          full plan and apply.
+        required: false
+        default: ''
 
 permissions:
   contents: read
@@ -53,10 +61,31 @@ jobs:
         run: |
           echo "TF_VAR_synthetic_probe_url=$(terraform output -raw api_gateway_invoke_url 2>/dev/null || echo '')" >> "$GITHUB_ENV"
 
+      # A targeted plan exists for one situation: the plan role has lost the
+      # ability to READ a resource the stack already owns, so a full plan fails
+      # at refresh before it can propose the fix — including when the fix is a
+      # permission on that same role. That is a genuine deadlock, because the
+      # apply job's plan uses the same role.
+      #
+      # -target limits refresh to the addressed resource and its dependencies,
+      # so the unreadable resource is never touched and the permission can be
+      # granted through the pipeline instead of from somebody's laptop.
+      #
+      # It is break-glass: a targeted apply leaves state partially refreshed, so
+      # the next run must be a normal full one. The warning below says so in the
+      # run log, and the plan is still saved and still gated on approval.
       - name: Terraform plan
         env:
           TF_VAR_service_auth_secret_value: ${{ secrets.TF_VAR_SERVICE_AUTH_SECRET_VALUE }}
-        run: terraform plan -out=tfplan -input=false
+          PLAN_TARGET: ${{ github.event.inputs.target }}
+        run: |
+          set -euo pipefail
+          if [ -n "${PLAN_TARGET:-}" ]; then
+            echo "::warning::Break-glass targeted plan limited to '${PLAN_TARGET}'. State will be only partially refreshed — run a full apply next."
+            terraform plan -out=tfplan -input=false -target="${PLAN_TARGET}"
+          else
+            terraform plan -out=tfplan -input=false
+          fi
 
       - name: Show plan
         run: terraform show -no-color tfplan >> "$GITHUB_STEP_SUMMARY"
