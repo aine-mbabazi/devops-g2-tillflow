@@ -267,7 +267,7 @@ probe all bill continuously while running.
 - [`docs/architecture.md`](docs/architecture.md) — system architecture
 - [`docs/payment-contract.md`](docs/payment-contract.md) — proposed POS → Payments contract for G0 review
 - [`docs/commission-payout-contract.md`](docs/commission-payout-contract.md) — proposed Commission → Payments B2C contract for G0 review
-- [`docs/adr/`](docs/adr/) — architecture decision records, including [0004 — caching and queueing](docs/adr/0004-caching-and-queueing.md)
+- [`docs/adr/`](docs/adr/) — architecture decision records, including [0004 — caching and queueing](docs/adr/0004-caching-and-queueing.md) and [0005 — why the CodePipeline lane is not built](docs/adr/0005-no-codepipeline-lane.md)
 - [`docs/threat-model.md`](docs/threat-model.md) — threat model
 - [`docs/production-readiness.md`](docs/production-readiness.md) — production readiness review: what is solid, what would stop a real launch, and in what order to fix it
 - [`docs/slo-error-budgets.md`](docs/slo-error-budgets.md) — SLOs and error budgets
