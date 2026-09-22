@@ -353,19 +353,38 @@ explanation and these are the places where neither yet exists.
 - **RTO and RPO are asserted, not measured.** The 30-minute and 5-minute figures
   are design intent derived from how the mechanisms work. Only the restore drill
   converts them into evidence.
-- **The probe is provisioned but stuck in `ERROR`, and the fix already
-  written in code cannot be applied.** `synthetic_probe_url` has been set and
-  the canary exists live (confirmed via `aws synthetics describe-canaries`),
-  but `CREATE_FAILED` with `MemorySize` must be `<= 512` — this account caps
-  Lambda memory at 512 MB. `synthetics.tf` already documents this exact error
-  and sets `memory_in_mb = 512` to match it, but `terraform plan` rejects that
-  value at the client-side validation stage: `expected run_config.0.memory_in_mb
-  to be at least (960), got 512` — the Terraform AWS provider itself enforces
-  a 960 MB floor for the `syn-nodejs-puppeteer-9.0` runtime. AWS's account-level
-  cap and the provider's own validation are mutually exclusive for this
-  runtime; no value of `memory_in_mb` satisfies both. Fixing this needs either
-  a non-puppeteer Synthetics runtime with a lower memory floor, or an AWS
-  Lambda memory quota increase for this account — neither attempted here.
+- **The probe runs, but has not been confirmed publishing.** The
+  Synthetics-canary deadlock described in earlier revisions of this file is
+  resolved and no longer applies: the canary was removed and replaced with an
+  EventBridge-scheduled Lambda (PR #81). `Infra Apply` went green at
+  2026-09-21T14:51Z after a full day red, creating the schedule rule, target
+  and invoke permission; the Lambda, its log group and the
+  `devops-g2-synthetic-probe-failing` alarm were created in the partial apply
+  minutes earlier. The old canary and its artifact bucket destroyed cleanly.
+
+  What is **not** yet evidenced is a datapoint. Nobody has confirmed
+  `TillFlow/synthetics` `SuccessPercent` actually has data:
+
+  ```bash
+  aws cloudwatch get-metric-statistics --namespace TillFlow/synthetics \
+    --metric-name SuccessPercent --dimensions Name=ProbeName,Value=devops-g2-probe \
+    --start-time "$(date -u -v-30M +%Y-%m-%dT%H:%M:%SZ)" \
+    --end-time "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+    --period 300 --statistics Average --region us-east-2
+  ```
+
+  There is one indirect signal in the meantime. The probe alarm is the only
+  alarm in this stack with `treat_missing_data = "breaching"`, at 2-of-3
+  datapoints on a 60-second period — so if the probe were not publishing, it
+  would have gone to ALARM within about three minutes and delivered to Slack
+  through the path this file already evidences. **Absence of that alert is
+  weak evidence the probe is healthy; it is not a substitute for the metric.**
+
+  Why the canary could not work, kept because the reasoning is the point: this
+  account caps Lambda `MemorySize` at 512 MB, and the Terraform provider
+  enforces a 960 MB floor for `aws_synthetics_canary`. No value satisfies both,
+  so a canary is not creatable here at all. Full timeline in
+  [`docs/scar-log.md`](../../docs/scar-log.md).
 - **The Grafana dashboard has now been rendered against live CloudWatch,
   confirmed 2026-09-21.** A local Grafana instance (Docker) was pointed at a
   CloudWatch data source using the account's own credentials, and
@@ -377,16 +396,26 @@ explanation and these are the places where neither yet exists.
   auto-discovery this dashboard was designed around actually works, not just
   that the JSON is syntactically valid.
 
-  Every panel shows "No data," which is expected, not a failure: the uptime
-  panels query the synthetic probe (`CloudWatchSynthetics`/`SuccessPercent`,
-  `CanaryName: devops-g2-probe`), and the probe is stuck in `ERROR` rather
-  than actually running — see the bullet above. The RED panels need sustained
-  traffic in the query
-  window; the only load run against the deployed stack so far is the 30-second
-  k6 smoke run (see "Load testing and capacity" above), which is too brief and
-  too far outside the default 6-hour window to register. "Imports cleanly
-  against real infra" is now proven; "shows real data" still needs either the
-  probe running or a sustained load window, neither attempted here.
+  Every panel showed "No data" during that test, which was expected rather
+  than a failure: at the time the uptime panels queried the canary that could
+  never start, and the RED panels need sustained traffic in the query window —
+  the only load run against the deployed stack is the 30-second k6 smoke run
+  (see "Load testing and capacity"), too brief and too far outside the default
+  6-hour window to register.
+
+  **Two things about that test are now out of date.** The uptime panels no
+  longer query `CloudWatchSynthetics`/`CanaryName`; PR #81 repointed them to
+  `TillFlow/synthetics`/`ProbeName` when the canary was replaced by the Lambda
+  probe, in both this dashboard and the CloudWatch one. And the probe is no
+  longer stuck — it is deployed and scheduled. So the "No data" result above
+  should not be read as the current state of the uptime panels; it is a record
+  of a test run against the previous metric source.
+
+  What that test does still prove, and it is the part worth keeping: the
+  dashboard **imports cleanly against real infrastructure** and its template
+  variables resolve against live resources. "Shows real data" remains
+  unproven and needs the probe metric confirmed (see above) plus a sustained
+  load window.
 - **`smoke.js` has now run against the live deployed stack and passed** —
   see the new subsection under "Load testing and capacity" below. The other
   four profiles (`baseline`, `spike`, `soak`, `capacity`) remain local-only,
