@@ -42,6 +42,19 @@ resource "aws_iam_role" "github_actions_deploy" {
 }
 
 data "aws_iam_policy_document" "github_actions_permissions" {
+  # terraform plan must read the probe's EventBridge rule/target; the apply
+  # role has events:* but this plan role had no events access at all.
+  statement {
+    sid    = "ProbeScheduleRead"
+    effect = "Allow"
+    actions = [
+      "events:DescribeRule",
+      "events:ListTargetsByRule",
+      "events:ListTagsForResource",
+    ]
+    resources = ["arn:aws:events:us-east-2:${local.account_id}:rule/${local.name_prefix}-*"]
+  }
+
   statement {
     sid    = "ECRPushPull"
     effect = "Allow"
