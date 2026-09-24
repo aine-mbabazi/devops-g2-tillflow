@@ -284,6 +284,12 @@ jobs:
       - name: Terraform init
         run: terraform init
 
+      # Same as infra-apply.yml: the probe is gated on this var (empty = off).
+      # Without it the PR plan shows the live probe being destroyed.
+      - name: Read API Gateway invoke URL for the synthetic probe
+        run: |
+          echo "TF_VAR_synthetic_probe_url=$(terraform output -raw api_gateway_invoke_url 2>/dev/null || echo '')" >> "$GITHUB_ENV"
+
       - name: Terraform plan
         env:
           TF_VAR_service_auth_secret_value: ${{ secrets.TF_VAR_SERVICE_AUTH_SECRET_VALUE }}
