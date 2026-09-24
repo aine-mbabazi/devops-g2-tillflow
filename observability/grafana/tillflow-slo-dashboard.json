@@ -122,7 +122,7 @@
           "dimensionKey": "LoadBalancer",
           "dimensionFilters": {}
         },
-        "regex": "/.*devops-g2-alb.*/",
+        "regex": "/^app\\/devops-g2-alb\\/.*/",
         "refresh": 1,
         "includeAll": false,
         "multi": false,
@@ -216,7 +216,12 @@
           },
           "statistic": "Average",
           "period": "300",
-          "region": "$region"
+          "region": "$region",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "matchExact": true,
+          "id": ""
         }
       ]
     },
@@ -278,7 +283,12 @@
           },
           "statistic": "Average",
           "period": "3600",
-          "region": "$region"
+          "region": "$region",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "matchExact": true,
+          "id": ""
         }
       ]
     },
@@ -342,7 +352,12 @@
           },
           "statistic": "Average",
           "period": "3600",
-          "region": "$region"
+          "region": "$region",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "matchExact": true,
+          "id": ""
         }
       ]
     },
@@ -394,26 +409,36 @@
           "namespace": "AWS/ApplicationELB",
           "metricName": "HTTPCode_Target_5XX_Count",
           "dimensions": {
-            "TargetGroup": "$pos_tg"
+            "TargetGroup": "$pos_tg",
+            "LoadBalancer": "$alb"
           },
           "statistic": "Sum",
           "period": "3600",
           "region": "$region",
           "hide": true,
-          "id": "errors"
+          "id": "errors",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "matchExact": true
         },
         {
           "refId": "B",
           "namespace": "AWS/ApplicationELB",
           "metricName": "RequestCount",
           "dimensions": {
-            "TargetGroup": "$pos_tg"
+            "TargetGroup": "$pos_tg",
+            "LoadBalancer": "$alb"
           },
           "statistic": "Sum",
           "period": "3600",
           "region": "$region",
           "hide": true,
-          "id": "requests"
+          "id": "requests",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "matchExact": true
         },
         {
           "refId": "C",
@@ -421,7 +446,9 @@
           "id": "budget",
           "metricQueryType": 0,
           "metricEditorMode": 1,
-          "region": "$region"
+          "region": "$region",
+          "queryMode": "Metrics",
+          "matchExact": true
         }
       ]
     },
@@ -481,26 +508,36 @@
           "namespace": "AWS/ApplicationELB",
           "metricName": "HTTPCode_Target_5XX_Count",
           "dimensions": {
-            "TargetGroup": "$pos_tg"
+            "TargetGroup": "$pos_tg",
+            "LoadBalancer": "$alb"
           },
           "statistic": "Sum",
           "period": "3600",
           "region": "$region",
           "hide": true,
-          "id": "errors"
+          "id": "errors",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "matchExact": true
         },
         {
           "refId": "B",
           "namespace": "AWS/ApplicationELB",
           "metricName": "RequestCount",
           "dimensions": {
-            "TargetGroup": "$pos_tg"
+            "TargetGroup": "$pos_tg",
+            "LoadBalancer": "$alb"
           },
           "statistic": "Sum",
           "period": "3600",
           "region": "$region",
           "hide": true,
-          "id": "requests"
+          "id": "requests",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "matchExact": true
         },
         {
           "refId": "C",
@@ -509,7 +546,9 @@
           "label": "burn rate",
           "metricQueryType": 0,
           "metricEditorMode": 1,
-          "region": "$region"
+          "region": "$region",
+          "queryMode": "Metrics",
+          "matchExact": true
         }
       ]
     },
@@ -559,7 +598,12 @@
           "metricName": "CallbackLagMs",
           "statistic": "p95",
           "period": "300",
-          "region": "$region"
+          "region": "$region",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "matchExact": true,
+          "id": ""
         }
       ]
     },
@@ -604,24 +648,36 @@
           "namespace": "AWS/ApplicationELB",
           "metricName": "RequestCount",
           "dimensions": {
-            "TargetGroup": "$pos_tg"
+            "TargetGroup": "$pos_tg",
+            "LoadBalancer": "$alb"
           },
           "statistic": "Sum",
           "period": "60",
           "label": "POS",
-          "region": "$region"
+          "region": "$region",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "matchExact": true,
+          "id": ""
         },
         {
           "refId": "B",
           "namespace": "AWS/ApplicationELB",
           "metricName": "RequestCount",
           "dimensions": {
-            "TargetGroup": "$payments_tg"
+            "TargetGroup": "$payments_tg",
+            "LoadBalancer": "$alb"
           },
           "statistic": "Sum",
           "period": "60",
           "label": "Payments",
-          "region": "$region"
+          "region": "$region",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "matchExact": true,
+          "id": ""
         }
       ]
     },
@@ -656,24 +712,36 @@
           "namespace": "AWS/ApplicationELB",
           "metricName": "HTTPCode_Target_5XX_Count",
           "dimensions": {
-            "TargetGroup": "$pos_tg"
+            "TargetGroup": "$pos_tg",
+            "LoadBalancer": "$alb"
           },
           "statistic": "Sum",
           "period": "60",
           "label": "POS 5xx",
-          "region": "$region"
+          "region": "$region",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "matchExact": true,
+          "id": ""
         },
         {
           "refId": "B",
           "namespace": "AWS/ApplicationELB",
           "metricName": "HTTPCode_Target_5XX_Count",
           "dimensions": {
-            "TargetGroup": "$payments_tg"
+            "TargetGroup": "$payments_tg",
+            "LoadBalancer": "$alb"
           },
           "statistic": "Sum",
           "period": "60",
           "label": "Payments 5xx",
-          "region": "$region"
+          "region": "$region",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "matchExact": true,
+          "id": ""
         },
         {
           "refId": "C",
@@ -685,7 +753,12 @@
           "statistic": "Sum",
           "period": "60",
           "label": "ALB 5xx (no healthy target)",
-          "region": "$region"
+          "region": "$region",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "matchExact": true,
+          "id": ""
         }
       ]
     },
@@ -736,24 +809,36 @@
           "namespace": "AWS/ApplicationELB",
           "metricName": "TargetResponseTime",
           "dimensions": {
-            "TargetGroup": "$pos_tg"
+            "TargetGroup": "$pos_tg",
+            "LoadBalancer": "$alb"
           },
           "statistic": "p95",
           "period": "60",
           "label": "POS p95 (SLO 400ms)",
-          "region": "$region"
+          "region": "$region",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "matchExact": true,
+          "id": ""
         },
         {
           "refId": "B",
           "namespace": "AWS/ApplicationELB",
           "metricName": "TargetResponseTime",
           "dimensions": {
-            "TargetGroup": "$payments_tg"
+            "TargetGroup": "$payments_tg",
+            "LoadBalancer": "$alb"
           },
           "statistic": "p95",
           "period": "60",
           "label": "Payments p95",
-          "region": "$region"
+          "region": "$region",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "matchExact": true,
+          "id": ""
         }
       ]
     },
@@ -824,7 +909,12 @@
           "statistic": "Average",
           "period": "60",
           "label": "POS CPU",
-          "region": "$region"
+          "region": "$region",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "matchExact": true,
+          "id": ""
         },
         {
           "refId": "B",
@@ -837,7 +927,12 @@
           "statistic": "Average",
           "period": "60",
           "label": "POS memory",
-          "region": "$region"
+          "region": "$region",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "matchExact": true,
+          "id": ""
         },
         {
           "refId": "C",
@@ -850,7 +945,12 @@
           "statistic": "Average",
           "period": "60",
           "label": "Payments CPU",
-          "region": "$region"
+          "region": "$region",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "matchExact": true,
+          "id": ""
         },
         {
           "refId": "D",
@@ -863,7 +963,12 @@
           "statistic": "Average",
           "period": "60",
           "label": "Payments memory",
-          "region": "$region"
+          "region": "$region",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "matchExact": true,
+          "id": ""
         }
       ]
     },
@@ -902,7 +1007,12 @@
           "statistic": "Average",
           "period": "60",
           "label": "CPU %",
-          "region": "$region"
+          "region": "$region",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "matchExact": true,
+          "id": ""
         },
         {
           "refId": "B",
@@ -914,7 +1024,12 @@
           "statistic": "Maximum",
           "period": "60",
           "label": "connections",
-          "region": "$region"
+          "region": "$region",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "matchExact": true,
+          "id": ""
         }
       ]
     },
@@ -962,7 +1077,12 @@
           "statistic": "Sum",
           "period": "300",
           "label": "sales recorded",
-          "region": "$region"
+          "region": "$region",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "matchExact": true,
+          "id": ""
         },
         {
           "refId": "B",
@@ -971,7 +1091,12 @@
           "statistic": "Sum",
           "period": "300",
           "label": "payments dispatched",
-          "region": "$region"
+          "region": "$region",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "matchExact": true,
+          "id": ""
         }
       ]
     },
@@ -1022,7 +1147,12 @@
           "statistic": "Sum",
           "period": "300",
           "label": "callback conflicts",
-          "region": "$region"
+          "region": "$region",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "matchExact": true,
+          "id": ""
         },
         {
           "refId": "B",
@@ -1031,7 +1161,12 @@
           "statistic": "Sum",
           "period": "300",
           "label": "reconcile mismatches",
-          "region": "$region"
+          "region": "$region",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "matchExact": true,
+          "id": ""
         },
         {
           "refId": "C",
@@ -1040,7 +1175,12 @@
           "statistic": "Sum",
           "period": "300",
           "label": "daily close failures",
-          "region": "$region"
+          "region": "$region",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "matchExact": true,
+          "id": ""
         }
       ]
     },
@@ -1077,7 +1217,12 @@
           "statistic": "Sum",
           "period": "86400",
           "label": "payouts disbursed",
-          "region": "$region"
+          "region": "$region",
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0,
+          "matchExact": true,
+          "id": ""
         }
       ]
     }
