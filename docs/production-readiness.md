@@ -111,6 +111,43 @@ out", which is not the same as knowing.
   skip: re-querying Daraja for payments that were `pending` at the restore
   point. A restore rewinds TillFlow's record of the world, not the provider's.
 
+### 6. Destroy and rebuild — gated, not exercised
+
+A real `terraform destroy` fails today, on purpose: the four S3 buckets
+(`artifacts`, `logs`, `backups`, `evidence`) are versioned with no
+`force_destroy`, and the four ECR repositories are `IMMUTABLE` with no
+`force_delete` — either blocks destroy on any non-empty resource. Both are now
+gated behind Terraform variables (`bucket_force_destroy`, `ecr_force_delete`,
+`infra/main/variables.tf`), defaulting to `false` so an ordinary destroy still
+fails loudly rather than silently discarding versioned objects or shipped
+images. RDS is not a blocker — `skip_final_snapshot = true` and
+`deletion_protection = false` (§4) mean it destroys cleanly already.
+
+**Teardown sequence, when actually intended:**
+
+```bash
+cd infra/main
+TF_VAR_bucket_force_destroy=true TF_VAR_ecr_force_delete=true terraform apply
+
+# Confirm before destroying, not after:
+aws s3api list-buckets --query 'Buckets[?starts_with(Name,`devops-g2-`)].Name'
+aws ecr describe-repositories --query 'repositories[?starts_with(repositoryName,`devops-g2/`)].repositoryName'
+
+terraform destroy
+# infra/bootstrap only if the state bucket itself must go, and only once it is empty
+```
+
+**A real destroy → rebuild has not been executed.** What exists is the gate
+above and the fact that every service is already deployed by the same
+mechanism a rebuild would use (`release-*.yml`, task-def render + deploy +
+post-deploy smoke) — so a rebuild's shape is proven piecewise, not end to end.
+Executing it for real would mean: `terraform destroy` from this sequence,
+`terraform apply` from `main` at the same commit, then the same live-URL smoke
+check already used elsewhere (`GET /health`, `GET /ready` through the API
+Gateway invoke URL) confirming a live `200` on the rebuilt stack. Not claimed
+here, following the same rule the rest of this document holds to: unrehearsed
+recovery is named as unrehearsed, not implied.
+
 ---
 
 ## Operational readiness
