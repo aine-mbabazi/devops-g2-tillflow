@@ -332,6 +332,38 @@ of it.
 Stated plainly, because the assessment rule rewards reproducibility over
 explanation and these are the places where neither yet exists.
 
+**Tooling for the remaining gaps now exists; none of it has been re-executed
+yet** (this pass had no AWS credentials available to run it — see each
+script's own header for the exact command to run it for real):
+
+- `game-day/drill-06-abandoned-payment.mjs` — a live-infra alarm-firing→recovery
+  drill. Confirmed by reading the deployed code paths (not asserted): the
+  deployed Payments task runs `DARAJA_MODE=fake`, so a payment created against
+  the real API Gateway with its callback deliberately withheld lands in the
+  reconciliation DLQ through nothing but ordinary API calls, tripping
+  `devops-g2-reconciliation-dlq-not-empty` for real — no `set-alarm-state`
+  involved. Writes `g3-alarm-firing.json`.
+- `game-day/drill-03-platform-failure.mjs` — promotes the original ad-hoc
+  commands (Payments task stop, 7m23s recovery) into a repeatable script that
+  additionally captures the alarm-history and Slack-delivery evidence the
+  first run was missing. Writes `g4-platform-failure.json`.
+- `game-day/drill-05-restore.mjs` — re-runs the documented PITR restore end to
+  end, this time executing and capturing the reconciliation step
+  (`runbook.md#backup-and-restore` step 2) via `evidence/run-in-vpc.sh` +
+  `verify-restore.mjs`, and reporting whatever the real RTO/RPO numbers are.
+  Writes `g4-restore.json`.
+- `evidence/payments-integrity/capture-trace.mjs` — captures one real X-Ray
+  trace for the sale→pay→callback path and one for a triggered Commission
+  run, distilled into `g3-trace-payment.json` / `g3-trace-commission.json`.
+- `load/k6/baseline.js` and `spike.js` now accept `BASELINE_RATES` /
+  `SPIKE_BASE_RATE` + `SPIKE_PEAK_RATE` env overrides (matching the pattern
+  `soak.js` already had), so they can be pointed at the deployed edge with a
+  rate sized for `desired_count = 1` instead of the laptop-sized local
+  numbers — see `load/k6/README.md`.
+
+The bullets below are the original, unmodified findings from the last
+executed pass.
+
 - **Drill 3 (platform failure) was executed.** The Payments task was
   stopped and ECS launched a replacement that returned healthy/running. The
   run lasted from 2026-09-20T21:48:30Z to 2026-09-20T21:55:53Z, for a measured

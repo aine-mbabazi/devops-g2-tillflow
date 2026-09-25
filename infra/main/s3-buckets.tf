@@ -1,7 +1,8 @@
 # Artifacts bucket — CI/CD build artifacts
 resource "aws_s3_bucket" "artifacts" {
-  bucket = "devops-g2-artifacts-${local.account_id}"
-  tags   = merge(local.common_tags, { service = "ci-cd" })
+  bucket        = "devops-g2-artifacts-${local.account_id}"
+  force_destroy = var.bucket_force_destroy
+  tags          = merge(local.common_tags, { service = "ci-cd" })
 }
 
 resource "aws_s3_bucket_versioning" "artifacts" {
@@ -47,8 +48,9 @@ resource "aws_s3_bucket_lifecycle_configuration" "artifacts" {
 
 # Logs bucket — ALB access logs
 resource "aws_s3_bucket" "logs" {
-  bucket = "devops-g2-logs-${local.account_id}"
-  tags   = merge(local.common_tags, { service = "networking" })
+  bucket        = "devops-g2-logs-${local.account_id}"
+  force_destroy = var.bucket_force_destroy
+  tags          = merge(local.common_tags, { service = "networking" })
 }
 
 resource "aws_s3_bucket_versioning" "logs" {
@@ -94,8 +96,9 @@ resource "aws_s3_bucket_lifecycle_configuration" "logs" {
 
 # Backups bucket — DB/export backups
 resource "aws_s3_bucket" "backups" {
-  bucket = "devops-g2-backups-${local.account_id}"
-  tags   = merge(local.common_tags, { service = "database" })
+  bucket        = "devops-g2-backups-${local.account_id}"
+  force_destroy = var.bucket_force_destroy
+  tags          = merge(local.common_tags, { service = "database" })
 }
 
 resource "aws_s3_bucket_versioning" "backups" {
@@ -141,8 +144,9 @@ resource "aws_s3_bucket_lifecycle_configuration" "backups" {
 
 # Evidence bucket — capstone evidence pack
 resource "aws_s3_bucket" "evidence" {
-  bucket = "devops-g2-evidence-${local.account_id}"
-  tags   = merge(local.common_tags, { service = "capstone" })
+  bucket        = "devops-g2-evidence-${local.account_id}"
+  force_destroy = var.bucket_force_destroy
+  tags          = merge(local.common_tags, { service = "capstone" })
 }
 
 resource "aws_s3_bucket_versioning" "evidence" {

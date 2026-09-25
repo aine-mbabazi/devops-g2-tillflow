@@ -59,16 +59,44 @@ SERVICE_AUTH_SECRET=local-load-secret k6 run load/k6/smoke.js
 SERVICE_AUTH_SECRET=local-load-secret k6 run -e STEP_RATE=400 load/k6/step.js
 ```
 
-Against a deployed environment, point it at the API Gateway instead:
+Against a deployed environment, point it at the API Gateway instead. `smoke.js`
+needs nothing extra — it has already been run this way (see
+`evidence/reliability-operations/README.md`). `baseline.js` and `spike.js`
+default to the same laptop-sized rates as the local runs above, which is not
+appropriate to point at a `desired_count = 1` ECS task — override the rate
+envs to start much lower and step up deliberately:
 
 ```bash
 SERVICE_AUTH_SECRET=<the real secret> \
 POS_BASE_URL=$(cd infra/main && terraform output -raw api_gateway_invoke_url) \
-k6 run load/k6/baseline.js
+BASELINE_RATES=1,2,4,6,8 \
+k6 run --summary-export evidence/reliability-operations/k6/deployed-baseline-$(date +%Y%m%d).json \
+  load/k6/baseline.js | tee evidence/reliability-operations/k6/deployed-baseline-$(date +%Y%m%d).txt
+
+SERVICE_AUTH_SECRET=<the real secret> \
+POS_BASE_URL=$(cd infra/main && terraform output -raw api_gateway_invoke_url) \
+SPIKE_BASE_RATE=1 SPIKE_PEAK_RATE=10 \
+k6 run --summary-export evidence/reliability-operations/k6/deployed-spike-$(date +%Y%m%d).json \
+  load/k6/spike.js | tee evidence/reliability-operations/k6/deployed-spike-$(date +%Y%m%d).txt
+
+# soak already supports the same pattern
+SERVICE_AUTH_SECRET=<the real secret> \
+POS_BASE_URL=$(cd infra/main && terraform output -raw api_gateway_invoke_url) \
+SOAK_RATE=2 SOAK_DURATION=16m \
+k6 run --summary-export evidence/reliability-operations/k6/deployed-soak-$(date +%Y%m%d).json \
+  load/k6/soak.js | tee evidence/reliability-operations/k6/deployed-soak-$(date +%Y%m%d).txt
 ```
 
-Each run writes `evidence/reliability-operations/k6/<profile>.json` from the
-repo root. That file is the evidence; the terminal summary is not.
+Take a CloudWatch metrics snapshot (ECS CPU/memory, RDS CPU/connections, ALB
+target response time) immediately before and after each run and save it
+alongside the JSON, the same way the local capacity-model runs are documented
+— the deployed ceiling is unmeasured, so these figures are what turns "it
+worked once" into an actual envelope.
+
+Each local run writes `evidence/reliability-operations/k6/<profile>.json` from
+the repo root via `handleSummary`; the deployed runs above use `--summary-export`
+to the same directory with a `deployed-` prefix instead, so the two are never
+confused. That file is the evidence; the terminal summary is not.
 
 ## Reading the results
 

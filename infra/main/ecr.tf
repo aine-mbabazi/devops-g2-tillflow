@@ -1,6 +1,7 @@
 resource "aws_ecr_repository" "payments" {
   name                 = "${local.name_prefix}/payments"
   image_tag_mutability = "IMMUTABLE"
+  force_delete         = var.ecr_force_delete
 
   image_scanning_configuration {
     scan_on_push = true
@@ -12,6 +13,7 @@ resource "aws_ecr_repository" "payments" {
 resource "aws_ecr_repository" "pos" {
   name                 = "${local.name_prefix}/pos"
   image_tag_mutability = "IMMUTABLE"
+  force_delete         = var.ecr_force_delete
 
   image_scanning_configuration {
     scan_on_push = true
@@ -23,6 +25,7 @@ resource "aws_ecr_repository" "pos" {
 resource "aws_ecr_repository" "commission" {
   name                 = "${local.name_prefix}/commission"
   image_tag_mutability = "IMMUTABLE"
+  force_delete         = var.ecr_force_delete
 
   image_scanning_configuration {
     scan_on_push = true
@@ -34,6 +37,7 @@ resource "aws_ecr_repository" "commission" {
 resource "aws_ecr_repository" "web" {
   name                 = "${local.name_prefix}/web"
   image_tag_mutability = "IMMUTABLE"
+  force_delete         = var.ecr_force_delete
 
   image_scanning_configuration {
     scan_on_push = true

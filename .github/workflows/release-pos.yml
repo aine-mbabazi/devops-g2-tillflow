@@ -184,6 +184,14 @@ jobs:
       # Runs when the deploy or the smoke failed. ECS will happily sit on a
       # broken-but-stable revision, so the rollback is explicit, and the job
       # still fails afterwards — a recovered deploy is not a successful one.
+      #
+      # Game-day drill 4 found that `aws ecs wait services-stable` here is not
+      # a reliable signal: its fixed ~10-minute polling budget timed out and
+      # reported failure even after the rollback had, in fact, succeeded
+      # (confirmed separately via describe-services). Polling the service's
+      # own rollout state directly — the same technique the post-deploy smoke
+      # step above already uses — replaces that opaque waiter with an explicit,
+      # longer, logged deadline instead of a magic timeout.
       - name: Roll back on failure
         if: failure() && steps.previous.outputs.arn != ''
         run: |
@@ -193,7 +201,28 @@ jobs:
             --cluster devops-g2 --service devops-g2-pos --region us-east-2 \
             --task-definition "${{ steps.previous.outputs.arn }}" \
             --force-new-deployment > /dev/null
-          aws ecs wait services-stable \
-            --cluster devops-g2 --services devops-g2-pos --region us-east-2
+
+          ATTEMPTS=120
+          SLEEP_SECONDS=10
+          STABLE=""
+          for i in $(seq 1 "$ATTEMPTS"); do
+            SVC_JSON="$(aws ecs describe-services \
+              --cluster devops-g2 --services devops-g2-pos --region us-east-2)"
+            ROLLOUT="$(echo "$SVC_JSON" | jq -r '.services[0].deployments[] | select(.status=="PRIMARY") | .rolloutState')"
+            RUNNING="$(echo "$SVC_JSON" | jq -r '.services[0].runningCount')"
+            DESIRED="$(echo "$SVC_JSON" | jq -r '.services[0].desiredCount')"
+            echo "rollback attempt $i/$ATTEMPTS: rolloutState=$ROLLOUT running=$RUNNING desired=$DESIRED"
+            if [ "$ROLLOUT" = "COMPLETED" ] && [ "$RUNNING" = "$DESIRED" ]; then
+              STABLE=1
+              break
+            fi
+            sleep "$SLEEP_SECONDS"
+          done
+          [ -n "$STABLE" ] || {
+            echo "::error::rollback did not reach a stable primary deployment after $((ATTEMPTS * SLEEP_SECONDS))s"
+            aws ecs describe-services --cluster devops-g2 --services devops-g2-pos --region us-east-2
+            exit 1
+          }
+
           echo "Rolled back to ${{ steps.previous.outputs.arn }}"
           exit 1
