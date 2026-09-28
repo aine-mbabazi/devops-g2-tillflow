@@ -343,10 +343,6 @@ script's own header for the exact command to run it for real):
   reconciliation DLQ through nothing but ordinary API calls, tripping
   `devops-g2-reconciliation-dlq-not-empty` for real — no `set-alarm-state`
   involved. Writes `g3-alarm-firing.json`.
-- `game-day/drill-03-platform-failure.mjs` — promotes the original ad-hoc
-  commands (Payments task stop, 7m23s recovery) into a repeatable script that
-  additionally captures the alarm-history and Slack-delivery evidence the
-  first run was missing. Writes `g4-platform-failure.json`.
 - `game-day/drill-05-restore.mjs` — re-runs the documented PITR restore end to
   end, this time executing and capturing the reconciliation step
   (`runbook.md#backup-and-restore` step 2) via `evidence/run-in-vpc.sh` +
@@ -364,12 +360,14 @@ script's own header for the exact command to run it for real):
 The bullets below are the original, unmodified findings from the last
 executed pass.
 
-- **Drill 3 (platform failure) was executed.** The Payments task was
-  stopped and ECS launched a replacement that returned healthy/running. The
-  run lasted from 2026-09-20T21:48:30Z to 2026-09-20T21:55:53Z, for a measured
-  recovery time of 7m 23s. The required platform-failure alarm firing and
-  corresponding Slack alert were not captured, so this is execution evidence,
-  not a full Drill 3 pass.
+- **Drill 3 (platform failure) is now a full pass — see "Game day — drill 3"
+  below.** The two earlier executions (2026-09-20 ad hoc, and this script's
+  first version) stopped the Payments ECS task, which — confirmed live on
+  2026-09-28 — is structurally incapable of tripping the unhealthy-targets
+  alarm (a graceful ECS deregistration, not an ALB-detected failure). The
+  drill was corrected to the runbook's own second suggested injection
+  (revoke the RDS security group ingress) and now passes with alarm firing
+  and Slack delivery captured in both directions.
 - **Drill 4 (broken release) was executed but exceeded RTO.** A deliberately
   broken `/health` was deployed via a real release (`release-pos.yml`); the
   post-deploy smoke check correctly failed to stabilize and automated
@@ -500,9 +498,36 @@ effect, for the entire drill.
 stores on an ephemeral local server, not the deployed ECS/RDS stack — same
 caveat as the k6 capacity runs above. They prove the invariants hold in the
 real code; they do not prove the deployed infrastructure carries them
-through. Drills 3–5 needed the live stack; all three have now been attempted
-against it, and none is a full pass yet (see "Not yet proven" above for 3
-and 5, and "Game day — drill 4" below).
+through. Drills 3–6 needed the live stack; drill 3 is now a full pass (see
+"Game day — drill 3" below), drill 6 is a full pass as of PR #101
+(`evidence(g4): drill 6 abandoned-payment/DLQ, executed against deployed
+infra`), and drill 5 is still open (see "Not yet proven" above).
+
+## Game day — drill 3, 2026-09-28 (corrected injection, executed, pass)
+
+Platform failure, against the deployed stack. **The first two executions
+(2026-09-20 ad hoc, and this script's original version) used the wrong
+injection** — stopping the Payments ECS task — and neither ever captured
+the alarm firing. Re-running it live on 2026-09-28 proved why: `ecs
+stop-task` triggers a graceful deregistration (target goes `draining`, not
+`unhealthy`), and the replacement task passed its health check in ~28s,
+nowhere near the alarm's required 2 consecutive minutes of
+`UnHealthyHostCount > 0`. **Structurally incapable of tripping that alarm,
+not a flaky run** — a genuine defect in the drill's original design.
+
+Corrected to the runbook's own second suggested injection
+(`docs/runbook.md#game-day-drills`): revoked the shared `devops-g2-rds-sg`
+ingress rule. Only POS's ALB target group polls a dependency-aware endpoint
+(`/ready`), so this targets `pos-unhealthy-targets` specifically, using a
+real ALB-detected failure. Full detail:
+[`game-day/drill-03-README.md`](game-day/drill-03-README.md).
+
+**Result: full pass.** RDS ingress revoked 20:32:08Z → real alarm fired
+20:37:19Z → Slack delivered the firing alert → ingress restored 20:37:47Z →
+POS target healthy again 20:38:56Z (no task restart) → real alarm recovered
+20:41:19Z → Slack delivered the recovery alert. **RTO: 409 seconds (6m49s)**
+against the 30-minute target — comfortably under. All 7 checks in
+`g4-platform-failure.json` pass.
 
 ## Game day — drill 4, 2026-09-20 (executed, exceeded RTO)
 
