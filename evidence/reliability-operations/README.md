@@ -452,13 +452,14 @@ reflect genuine operational behavior rather than a smoothed-over demo:
 Both the firing and recovery notifications from a single alarm's lifecycle
 were delivered to Slack in this session.
 
-## Game day — drills 1 & 2 confirmed, 2026-09-20
+## Game day — drills 1 & 2 confirmed, 2026-09-20, re-run 2026-09-28
 
 Executed against the real `app.js` / `payment-store.js` / `reconciliation-queue.js`
 code, over real HTTP, on an ephemeral local server — DARAJA_MODE=fake per the
 project's deterministic-adapter rule. Only the Daraja transport is a stub;
 everything else is the actual production code path. Full JSON transcripts are
-in `game-day/drill-01-transcript.jsonl` and `game-day/drill-02-transcript.jsonl`.
+in `game-day/drill-01-transcript.jsonl` and `game-day/drill-02-transcript.jsonl`
+(latest run: both pass, all assertions green).
 
 **Drill 1 — Uncertain payment** (`docs/runbook.md#game-day-drills`)
 
@@ -503,6 +504,17 @@ real code; they do not prove the deployed infrastructure carries them
 through. Drills 3–5 needed the live stack; all three have now been attempted
 against it, and none is a full pass yet (see "Not yet proven" above for 3
 and 5, and "Game day — drill 4" below).
+
+**Moving these two to the deployed edge was attempted on 2026-09-28 and
+found structurally blocked, not just unattempted.** `DARAJA_MODE=fake` on
+the deployed Payments task means `FakeDarajaClient` cannot be driven to a
+`DARAJA_TIMEOUT` (drill 1) or to any terminal state (drill 2) over HTTP —
+`simulateOutcome`, the only lever for either, is JS-only. This is the same
+constraint drill 6 documents independently: a payment created against the
+real API Gateway "can NEVER be resolved through the public callback
+endpoint" in fake mode. Full detail and the decision taken (re-run locally
+rather than add a test-only trigger to `fake-client.js`) is in
+[`game-day/drill-01-02-README.md`](game-day/drill-01-02-README.md).
 
 ## Game day — drill 4, 2026-09-20 (executed, exceeded RTO)
 
