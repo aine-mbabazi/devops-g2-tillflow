@@ -25,7 +25,7 @@ resource "aws_security_group" "rds" {
     security_groups = [aws_security_group.ecs_tasks.id]
   }
 
-  tags = merge(local.common_tags, { service = "data" })
+  tags = merge(local.common_tags, { service = "data", Name = "${local.name_prefix}-rds-sg" })
 }
 
 resource "aws_db_instance" "main" {

@@ -44,7 +44,7 @@ resource "aws_kms_key" "alerts" {
     ]
   })
 
-  tags = merge(local.common_tags, { service = "reliability" })
+  tags = merge(local.common_tags, { service = "reliability", Name = "${local.name_prefix}-alerts-kms" })
 }
 
 resource "aws_kms_alias" "alerts" {
