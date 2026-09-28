@@ -78,6 +78,7 @@ data "aws_iam_policy_document" "github_actions_permissions" {
       "ecs:DescribeServices",
       "ecs:DescribeTaskDefinition",
       "ecs:RegisterTaskDefinition",
+      "ecs:TagResource",
       "ecs:UpdateService",
     ]
     resources = ["*"]

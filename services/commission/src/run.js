@@ -1,9 +1,11 @@
+import { SpanStatusCode, trace } from '@opentelemetry/api';
 import { loadConfig } from './config.js';
 import { runDailyClose, reconcilePendingLedgerEntries } from './daily-close.js';
 import { InMemoryCommissionLedger } from './ledger.js';
 import { PostgresCommissionLedger } from './postgres-ledger.js';
 import { PaymentsClient } from './payments-client.js';
 import { PosClient } from './pos-client.js';
+import { shutdownTelemetry } from './telemetry.js';
 
 const log = (entry) => console.log(JSON.stringify({
   timestamp: new Date().toISOString(), service: 'commission', ...entry,
@@ -22,6 +24,9 @@ async function main() {
   const paymentsClient = new PaymentsClient({ baseUrl: config.paymentsBaseUrl, serviceAuthSecret: config.serviceAuthSecret });
   const posClient = new PosClient({ baseUrl: config.posBaseUrl, serviceAuthSecret: config.serviceAuthSecret });
   const commissionRunId = process.env.COMMISSION_RUN_ID ?? defaultCommissionRunId();
+  trace.getActiveSpan()?.setAttributes({
+    'commission.run_id': commissionRunId, 'commission.tenant_ids': config.tenantIds.join(','),
+  });
   let ledger = new InMemoryCommissionLedger();
   let pool;
   if (config.ledgerStore === 'postgres') {
@@ -46,7 +51,19 @@ async function main() {
   }
 }
 
-main().catch((error) => {
-  log({ event: 'daily_close_failed', message: error.message });
-  process.exitCode = 1;
+// One root span for the whole run, so the calls to POS and Payments appear
+// as its children in a single trace rather than as disconnected roots.
+trace.getTracer('commission').startActiveSpan('commission.daily_close', async (span) => {
+  try {
+    await main();
+  } catch (error) {
+    span.recordException(error);
+    span.setStatus({ code: SpanStatusCode.ERROR, message: error.message });
+    log({ event: 'daily_close_failed', message: error.message });
+    process.exitCode = 1;
+  } finally {
+    span.end();
+    // Flush before the process exits, or the spans never reach the sidecar.
+    await shutdownTelemetry().catch(() => {});
+  }
 });

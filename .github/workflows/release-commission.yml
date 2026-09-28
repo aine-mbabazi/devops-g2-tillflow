@@ -73,10 +73,14 @@ jobs:
 
       - name: Download current task definition
         run: |
+          # --include TAGS: without it every release registered an untagged
+          # revision, which the tag audit (tagging API) cannot even see.
           aws ecs describe-task-definition \
             --task-definition devops-g2-commission \
             --region us-east-2 \
-            --query 'taskDefinition' > task-def.json
+            --include TAGS > task-def-full.json
+          jq '.taskDefinition' task-def-full.json > task-def.json
+          jq '.tags // []' task-def-full.json > task-def-tags.json
 
       - name: Render new task definition with updated image
         id: render
@@ -96,8 +100,11 @@ jobs:
           # describe-task-definition returns (taskDefinitionArn, revision,
           # status, ...). deploy-task-definition@v2 strips them internally,
           # but we register directly, so strip them here.
-          jq 'del(.taskDefinitionArn, .revision, .status, .requiresAttributes,
-                   .compatibilities, .registeredAt, .registeredBy)' \
+          # Carry the previous revision's tags forward onto the new one.
+          jq --slurpfile tags task-def-tags.json \
+            'del(.taskDefinitionArn, .revision, .status, .requiresAttributes,
+                 .compatibilities, .registeredAt, .registeredBy, .deregisteredAt)
+             + (if ($tags[0] | length) > 0 then {tags: $tags[0]} else {} end)' \
             "${{ steps.render.outputs.task-definition }}" > clean-task-def.json
           aws ecs register-task-definition \
             --cli-input-json file://clean-task-def.json \
