@@ -6,7 +6,9 @@ variable "service_auth_secret_value" {
 variable "tenant_ids" {
   type        = string
   description = "Comma-separated list of tenant IDs the Commission daily close iterates over"
-  default     = ""
+  # Must be non-empty: the Commission task exits with daily_close_failed when
+  # TENANT_IDS is empty. load-tenant is the tenant the deployed stack serves.
+  default = "load-tenant"
 }
 
 # G5 destroy/rebuild groundwork. Both default false so an ordinary `terraform
