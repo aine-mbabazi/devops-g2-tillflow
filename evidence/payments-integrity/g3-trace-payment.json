@@ -1,0 +1,42 @@
+{
+  "target": "payment",
+  "captured": "2026-09-28, deployed stack via public API Gateway",
+  "sale_id": "sale_012fa605-b8bf-474a-bbec-56392a7515ef",
+  "xray_trace_id": "1-6aba5b51-50bb98fdec0f3c888b2b466f",
+  "duration_seconds": 0.046,
+  "trace_found": true,
+  "services": [
+    {
+      "service": "pos",
+      "request": "POST http://exykmqaubj.execute-api.us-east-2.amazonaws.com:443/sales/sale_012fa605-b8bf-474a-bbec-56392a7515ef/pay",
+      "status": 202,
+      "duration_ms": 46
+    },
+    {
+      "service": "payments",
+      "request": "POST http://internal-devops-g2-alb-853726153.us-east-2.elb.amazonaws.com/payments",
+      "status": 202,
+      "duration_ms": 31
+    }
+  ],
+  "checks": [
+    {
+      "check": "sale created",
+      "ok": true
+    },
+    {
+      "check": "pay dispatched",
+      "ok": true
+    },
+    {
+      "check": "trace found in X-Ray",
+      "ok": true
+    },
+    {
+      "check": "trace covers pos and payments",
+      "ok": true
+    }
+  ],
+  "method_note": "The edge (API Gateway -> ALB) starts its own trace, so the X-Amzn-Trace-Id injected by capture-trace.mjs is not the one recorded. The trace was located by searching POS traces in the capture window for the sale id. Raw trace: g3-trace-payment-xray.json.",
+  "scope_note": "Covers sale pay -> POS -> Payments dispatch. Callback/reconcile is not in this trace: Payments runs in fake Daraja mode (no provider callback), and reconciliation is asynchronous via SQS."
+}
