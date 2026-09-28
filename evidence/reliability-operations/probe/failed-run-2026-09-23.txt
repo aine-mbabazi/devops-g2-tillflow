@@ -1,0 +1,2 @@
+2026-09-23T03:14:33.308Z	6040d196-4c37-4e27-aed5-09f143496059	ERROR	Invoke Error 	{"errorType":"Error","errorMessage":"payments-ready: expected 200, got 503 — {\"service\":\"payments\",\"status\":\"not_ready\"}","stack":["Error: payments-ready: expected 200, got 503 — {\"service\":\"payments\",\"status\":\"not_ready\"}","    at Runtime.handler (file:///var/task/index.mjs:116:30)","    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)"]}
+

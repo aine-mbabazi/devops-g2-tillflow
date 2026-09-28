@@ -101,13 +101,14 @@ holds no ongoing cost beyond negligible S3/DynamoDB storage.
 
 ## URLs
 
-- **API Gateway (public entry point):** the `api_gateway_invoke_url` Terraform
-  output. All external traffic enters here and is forwarded over a VPC Link to
-  the internal ALB.
+- **API Gateway (public entry point):** https://exykmqaubj.execute-api.us-east-2.amazonaws.com/
+  (the `api_gateway_invoke_url` Terraform output; it changes if the gateway is
+  recreated, so re-check it after a destroy/rebuild). All external traffic
+  enters here and is forwarded over a VPC Link to the internal ALB.
 - **ALB (internal only, not internet-facing):**
   `internal-devops-g2-alb-853726153.us-east-2.elb.amazonaws.com`
   — reachable from within the VPC only; not accessible from the public internet.
-- **Payments health check:** `<api-gateway-invoke-url>/health`
+- **Payments health check:** https://exykmqaubj.execute-api.us-east-2.amazonaws.com/health
 - **ECR repository:** `<account-id>.dkr.ecr.us-east-2.amazonaws.com/devops-g2/payments`
   (resolve `<account-id>` with `aws sts get-caller-identity --query Account --output text`)
 - **CloudWatch Logs:** `/devops-g2/payments`, `/devops-g2/pos`, `/devops-g2/commission`
