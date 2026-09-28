@@ -84,7 +84,7 @@ async function capturePayment() {
   const TENANT_ID = requireEnv('TENANT_ID');
 
   const traceId = newXrayTraceId();
-  const xrayHeader = `Root=${traceId}`;
+  const xrayHeader = `Root=${traceId};Sampled=1`;
   console.log(JSON.stringify({ event: 'trace_capture_started', target: 'payment', traceId }));
 
   const authHeader = () => signServiceAuth(TENANT_ID, SERVICE_AUTH_SECRET);
