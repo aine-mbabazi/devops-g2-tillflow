@@ -97,7 +97,7 @@ resource "aws_ecs_task_definition" "commission" {
 resource "aws_scheduler_schedule" "commission_daily" {
   name        = "${local.name_prefix}-commission-daily"
   description = "Commission daily close, once per day at 02:00 UTC (05:00 EAT)"
-  state       = "DISABLED" # enable after the first image is pushed to ECR
+  state       = "ENABLED"
 
   schedule_expression          = "cron(0 2 * * ? *)"
   schedule_expression_timezone = "UTC"
