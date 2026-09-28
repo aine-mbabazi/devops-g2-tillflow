@@ -64,8 +64,17 @@ async function pollUntil(deadlineMs, intervalMs, description, check) {
   throw new Error(`Timed out waiting for: ${description}`);
 }
 
+// Lambda console-log lines in CloudWatch are prefixed with
+// "<timestamp>\t<requestId>\t<level>\t" before the JSON payload the code
+// actually logged — not pure JSON on their own. Slicing to the first "{"
+// strips that prefix. Found live on 2026-09-28 re-running drill 6, which
+// shares this exact function: the Slack delivery confirmation timed out
+// after 10 minutes even though the real delivery happened within 8 seconds
+// of the alarm firing, because JSON.parse() was throwing on every log line.
 function tryParse(text) {
-  try { return JSON.parse(text); } catch { return null; }
+  const start = text.indexOf('{');
+  if (start === -1) return null;
+  try { return JSON.parse(text.slice(start)); } catch { return null; }
 }
 
 async function main() {

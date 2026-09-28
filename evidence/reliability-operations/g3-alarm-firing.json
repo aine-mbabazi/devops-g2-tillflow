@@ -1,0 +1,63 @@
+{
+  "drill": "devops-g2-abandoned-payment",
+  "set_alarm_state": false,
+  "substitution": "DARAJA_MODE=fake gives no HTTP-reachable way to make initiateStkPush fail, so the reconciliation message was seeded manually onto the live devops-g2-reconciliation queue (same shape app.js sends on a real dispatch failure) rather than being produced organically by an abandoned payment. Everything from that point on — consumer, redelivery, DLQ, alarm, Slack — is the real deployed mechanism.",
+  "note": "Steps 1-4 ran in the original 2026-09-28T19:29-19:46Z execution (transcript: drill-06-transcript.jsonl); that run's own Slack-confirmation step timed out due to a tryParse bug (fixed) even though delivery genuinely happened at 19:36:16.252Z. Steps 5-7 resumed against the same real payment/DLQ message rather than creating a third synthetic payment.",
+  "payment_id": "payment_7489c426-2cd2-482f-adef-a7428f5fa59e",
+  "tenant_id": "load-tenant",
+  "alarm": {
+    "name": "devops-g2-reconciliation-dlq-not-empty",
+    "ok_to_alarm": "2026-09-28T22:36:08.976000+03:00",
+    "alarm_to_ok": "2026-09-28T23:08:08.975000+03:00",
+    "alarm_reason": "Alarm updated from OK to ALARM",
+    "ok_reason": "Alarm updated from ALARM to OK"
+  },
+  "slack_lambda": {
+    "log_group": "/aws/lambda/devops-g2-slack-notifier",
+    "firing": {
+      "event": "alert_delivered",
+      "alarm": "devops-g2-reconciliation-dlq-not-empty",
+      "state": "ALARM"
+    },
+    "recovered": {
+      "event": "alert_delivered",
+      "alarm": "devops-g2-reconciliation-dlq-not-empty",
+      "state": "OK"
+    }
+  },
+  "dlq": {
+    "queue_url": "https://sqs.us-east-2.amazonaws.com/240462142849/devops-g2-reconciliation-dlq",
+    "landed_at": "2026-09-28T19:34:06.319Z",
+    "resolution": "deleted, not redriven — permanently unresolvable in DARAJA_MODE=fake"
+  },
+  "checks": [
+    {
+      "check": "payment dispatched as pending",
+      "ok": true
+    },
+    {
+      "check": "message reached the DLQ",
+      "ok": true
+    },
+    {
+      "check": "alarm fired from a real condition, no set-alarm-state",
+      "ok": true
+    },
+    {
+      "check": "Slack delivered the firing alert, not a placeholder",
+      "ok": true
+    },
+    {
+      "check": "DLQ message matched this drill's own payment before deletion",
+      "ok": true
+    },
+    {
+      "check": "alarm recovered to OK",
+      "ok": true
+    },
+    {
+      "check": "Slack delivered the recovery alert",
+      "ok": true
+    }
+  ]
+}
