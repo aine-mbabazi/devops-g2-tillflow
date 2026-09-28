@@ -166,7 +166,7 @@ async function captureCommission() {
     'xray', 'get-trace-summaries',
     '--start-time', String(Math.floor(startedAt.getTime() / 1000) - 10),
     '--end-time', String(Math.floor(stoppedAt.getTime() / 1000) + 10),
-    '--filter-expression', 'service("commission")',
+    '--filter-expression', 'service("commission.daily_close")',
   ]);
   const traceIds = (summaries?.TraceSummaries ?? []).map((t) => t.Id);
   const batch = traceIds.length ? aws(['xray', 'batch-get-traces', '--trace-ids', traceIds.join(',')]) : { Traces: [] };

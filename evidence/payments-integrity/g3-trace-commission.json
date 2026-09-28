@@ -1,0 +1,48 @@
+{
+  "target": "commission",
+  "captured": "2026-09-28, deployed stack, task revision devops-g2-commission:11",
+  "task_arn": "arn:aws:ecs:us-east-2:240462142849:task/devops-g2/bba1293df8ba4dae9a01d69cdb1fd7bc",
+  "commission_run_id": "close:2026-09-28",
+  "tenant": "load-tenant",
+  "payout_count": 0,
+  "xray_trace_id": "1-6aba780d-1da33b3c344c91e7fcfcfbaa",
+  "duration_seconds": 1.11,
+  "root_span": {
+    "name": "commission.daily_close",
+    "duration_ms": 1110
+  },
+  "downstream": [
+    {
+      "service": "pos",
+      "request": "GET http://internal-devops-g2-alb-853726153.us-east-2.elb.amazonaws.com/sales?status=paid&commission_run_id=close%3A2026-09-28",
+      "status": 200,
+      "parent_id": "31bb4a6380caa36e"
+    },
+    {
+      "service": "pos",
+      "request": "GET http://internal-devops-g2-alb-853726153.us-east-2.elb.amazonaws.com/tenants/load-tenant/config",
+      "status": 200,
+      "parent_id": "ebcc2447a769e39e"
+    }
+  ],
+  "checks": [
+    {
+      "check": "commission task ran to completion",
+      "ok": true
+    },
+    {
+      "check": "trace found in X-Ray",
+      "ok": true
+    },
+    {
+      "check": "trace covers commission",
+      "ok": true
+    },
+    {
+      "check": "downstream POS segments are children, not roots",
+      "ok": true
+    }
+  ],
+  "scope_note": "The close found no eligible paid sales (payout_count 0; Payments runs in fake Daraja mode, so sales never reach paid), so the Commission -> Payments payout call is not in this trace.",
+  "method_note": "X-Ray names the root segment after the root span, commission.daily_close, so the search must use service(\"commission.daily_close\"); capture-trace.mjs now does."
+}
