@@ -1,0 +1,47 @@
+{"ts":"2026-09-28T20:32:02.995Z","event":"drill_started","drill":"platform-failure","injection":"revoke_rds_ingress","target_service":"pos"}
+{"ts":"2026-09-28T20:32:08.057Z","event":"drill_step","step":1,"description":"revoking devops-g2-rds-sg (sg-0eca10397783cc6af) ingress on 5432 from devops-g2-ecs-tasks-sg (sg-0873df4bf96577c6c)"}
+{"ts":"2026-09-28T20:32:10.694Z","event":"drill_assertion","step":1,"result":"pass","revokedAt":"2026-09-28T20:32:08.057Z","detail":"RDS ingress revoked; all three services lose DB connectivity, only POS ALB target group (dependency-aware /ready) is expected to react"}
+{"ts":"2026-09-28T20:32:10.694Z","event":"drill_step","step":2,"description":"waiting for devops-g2-pos-unhealthy-targets OK -> ALARM in its real history"}
+{"ts":"2026-09-28T20:32:12.780Z","event":"poll_waiting","description":"devops-g2-pos-unhealthy-targets ALARM transition","elapsedMs":2086}
+{"ts":"2026-09-28T20:32:29.929Z","event":"poll_waiting","description":"devops-g2-pos-unhealthy-targets ALARM transition","elapsedMs":19235}
+{"ts":"2026-09-28T20:32:47.103Z","event":"poll_waiting","description":"devops-g2-pos-unhealthy-targets ALARM transition","elapsedMs":36409}
+{"ts":"2026-09-28T20:33:04.431Z","event":"poll_waiting","description":"devops-g2-pos-unhealthy-targets ALARM transition","elapsedMs":53737}
+{"ts":"2026-09-28T20:33:21.597Z","event":"poll_waiting","description":"devops-g2-pos-unhealthy-targets ALARM transition","elapsedMs":70903}
+{"ts":"2026-09-28T20:33:38.928Z","event":"poll_waiting","description":"devops-g2-pos-unhealthy-targets ALARM transition","elapsedMs":88234}
+{"ts":"2026-09-28T20:33:56.141Z","event":"poll_waiting","description":"devops-g2-pos-unhealthy-targets ALARM transition","elapsedMs":105447}
+{"ts":"2026-09-28T20:34:13.315Z","event":"poll_waiting","description":"devops-g2-pos-unhealthy-targets ALARM transition","elapsedMs":122621}
+{"ts":"2026-09-28T20:34:30.432Z","event":"poll_waiting","description":"devops-g2-pos-unhealthy-targets ALARM transition","elapsedMs":139738}
+{"ts":"2026-09-28T20:34:47.618Z","event":"poll_waiting","description":"devops-g2-pos-unhealthy-targets ALARM transition","elapsedMs":156924}
+{"ts":"2026-09-28T20:35:04.841Z","event":"poll_waiting","description":"devops-g2-pos-unhealthy-targets ALARM transition","elapsedMs":174147}
+{"ts":"2026-09-28T20:35:21.971Z","event":"poll_waiting","description":"devops-g2-pos-unhealthy-targets ALARM transition","elapsedMs":191277}
+{"ts":"2026-09-28T20:35:39.051Z","event":"poll_waiting","description":"devops-g2-pos-unhealthy-targets ALARM transition","elapsedMs":208357}
+{"ts":"2026-09-28T20:36:01.282Z","event":"poll_waiting","description":"devops-g2-pos-unhealthy-targets ALARM transition","elapsedMs":230588}
+{"ts":"2026-09-28T20:36:18.609Z","event":"poll_waiting","description":"devops-g2-pos-unhealthy-targets ALARM transition","elapsedMs":247915}
+{"ts":"2026-09-28T20:36:35.916Z","event":"poll_waiting","description":"devops-g2-pos-unhealthy-targets ALARM transition","elapsedMs":265222}
+{"ts":"2026-09-28T20:36:53.094Z","event":"poll_waiting","description":"devops-g2-pos-unhealthy-targets ALARM transition","elapsedMs":282400}
+{"ts":"2026-09-28T20:37:10.211Z","event":"poll_waiting","description":"devops-g2-pos-unhealthy-targets ALARM transition","elapsedMs":299517}
+{"ts":"2026-09-28T20:37:27.689Z","event":"drill_assertion","step":2,"result":"pass","alarmTimestamp":"2026-09-28T23:37:19.853000+03:00","historySummary":"Alarm updated from OK to ALARM"}
+{"ts":"2026-09-28T20:37:27.689Z","event":"drill_step","step":3,"description":"confirming Slack Lambda delivery for the firing alarm"}
+{"ts":"2026-09-28T20:37:30.035Z","event":"poll_waiting","description":"Slack notifier ALARM delivery log line","elapsedMs":2346}
+{"ts":"2026-09-28T20:37:47.736Z","event":"drill_assertion","step":3,"result":"pass","delivery":{"event":"alert_delivered","alarm":"devops-g2-pos-unhealthy-targets","state":"ALARM"}}
+{"ts":"2026-09-28T20:37:47.736Z","event":"drill_step","step":4,"description":"restoring devops-g2-rds-sg ingress on 5432 from devops-g2-ecs-tasks-sg"}
+{"ts":"2026-09-28T20:37:50.261Z","event":"drill_assertion","step":4,"result":"pass","restoredAt":"2026-09-28T20:37:47.736Z","detail":"RDS ingress restored — first safe action per docs/runbook.md#rds-saturation-adjacent DB connectivity issues: fix the dependency, not the ECS tasks"}
+{"ts":"2026-09-28T20:37:50.261Z","event":"drill_step","step":5,"description":"waiting for the POS target group to report a healthy target again"}
+{"ts":"2026-09-28T20:37:54.429Z","event":"poll_waiting","description":"devops-g2-pos-tg has a healthy target","elapsedMs":4168}
+{"ts":"2026-09-28T20:38:08.737Z","event":"poll_waiting","description":"devops-g2-pos-tg has a healthy target","elapsedMs":18476}
+{"ts":"2026-09-28T20:38:23.009Z","event":"poll_waiting","description":"devops-g2-pos-tg has a healthy target","elapsedMs":32748}
+{"ts":"2026-09-28T20:38:42.340Z","event":"poll_waiting","description":"devops-g2-pos-tg has a healthy target","elapsedMs":52079}
+{"ts":"2026-09-28T20:38:56.566Z","event":"drill_assertion","step":5,"result":"pass","recoveredAt":"2026-09-28T20:38:56.566Z","detail":"POS target healthy again, no task restart involved — same task, /ready simply started passing again"}
+{"ts":"2026-09-28T20:38:56.566Z","event":"drill_step","step":6,"description":"waiting for devops-g2-pos-unhealthy-targets ALARM -> OK"}
+{"ts":"2026-09-28T20:38:58.648Z","event":"poll_waiting","description":"devops-g2-pos-unhealthy-targets OK transition","elapsedMs":2082}
+{"ts":"2026-09-28T20:39:15.813Z","event":"poll_waiting","description":"devops-g2-pos-unhealthy-targets OK transition","elapsedMs":19247}
+{"ts":"2026-09-28T20:39:33.121Z","event":"poll_waiting","description":"devops-g2-pos-unhealthy-targets OK transition","elapsedMs":36555}
+{"ts":"2026-09-28T20:39:50.305Z","event":"poll_waiting","description":"devops-g2-pos-unhealthy-targets OK transition","elapsedMs":53739}
+{"ts":"2026-09-28T20:40:07.462Z","event":"poll_waiting","description":"devops-g2-pos-unhealthy-targets OK transition","elapsedMs":70896}
+{"ts":"2026-09-28T20:40:24.623Z","event":"poll_waiting","description":"devops-g2-pos-unhealthy-targets OK transition","elapsedMs":88057}
+{"ts":"2026-09-28T20:40:41.957Z","event":"poll_waiting","description":"devops-g2-pos-unhealthy-targets OK transition","elapsedMs":105391}
+{"ts":"2026-09-28T20:40:59.139Z","event":"poll_waiting","description":"devops-g2-pos-unhealthy-targets OK transition","elapsedMs":122573}
+{"ts":"2026-09-28T20:41:16.267Z","event":"poll_waiting","description":"devops-g2-pos-unhealthy-targets OK transition","elapsedMs":139701}
+{"ts":"2026-09-28T20:41:33.357Z","event":"drill_assertion","step":6,"result":"pass","alarmTimestamp":"2026-09-28T23:41:19.852000+03:00","historySummary":"Alarm updated from ALARM to OK"}
+{"ts":"2026-09-28T20:41:35.900Z","event":"drill_assertion","step":7,"result":"pass","delivery":{"event":"alert_delivered","alarm":"devops-g2-pos-unhealthy-targets","state":"OK"}}
+{"ts":"2026-09-28T20:41:35.901Z","event":"drill_completed","drill":"platform-failure","result":"pass","rtoSeconds":409}
