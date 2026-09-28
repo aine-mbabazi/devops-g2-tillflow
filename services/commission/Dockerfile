@@ -17,4 +17,4 @@ USER node
 
 # One-shot worker: EventBridge Scheduler runs this task once per day, it
 # exits, and the next schedule starts a fresh task.
-CMD ["node", "src/run.js"]
+CMD ["node", "--import", "./src/register.js", "--import", "./src/telemetry.js", "src/run.js"]

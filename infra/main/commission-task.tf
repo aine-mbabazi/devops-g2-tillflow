@@ -25,6 +25,9 @@ resource "aws_ecs_task_definition" "commission" {
         { name = "POS_BASE_URL", value = "http://${aws_lb.main.dns_name}" },
         { name = "PAYMENTS_BASE_URL", value = "http://${aws_lb.main.dns_name}" },
         { name = "TENANT_IDS", value = var.tenant_ids },
+        { name = "OTEL_SERVICE_NAME", value = "commission" },
+        { name = "OTEL_EXPORTER_OTLP_ENDPOINT", value = "http://localhost:4318" },
+        { name = "OTEL_EXPORTER_OTLP_PROTOCOL", value = "http/protobuf" },
         { name = "LEDGER_STORE", value = "postgres" },
       ]
       secrets = [
