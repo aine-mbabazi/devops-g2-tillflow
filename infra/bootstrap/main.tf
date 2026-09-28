@@ -31,6 +31,7 @@ resource "aws_kms_key" "s3" {
   description             = "${local.name_prefix} shared S3 encryption key"
   deletion_window_in_days = 7
   tags = merge(local.common_tags, {
+    Name    = "${local.name_prefix}-tfstate-kms"
     service = "shared"
   })
 }

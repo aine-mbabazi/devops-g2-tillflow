@@ -26,14 +26,14 @@ resource "aws_apigatewayv2_vpc_link" "main" {
   subnet_ids         = aws_subnet.private[*].id
   security_group_ids = [aws_security_group.vpc_link.id]
 
-  tags = merge(local.common_tags, { service = "networking" })
+  tags = merge(local.common_tags, { service = "networking", Name = "${local.name_prefix}-vpc-link" })
 }
 
 resource "aws_apigatewayv2_api" "main" {
   name          = "${local.name_prefix}-api"
   protocol_type = "HTTP"
 
-  tags = merge(local.common_tags, { service = "networking" })
+  tags = merge(local.common_tags, { service = "networking", Name = "${local.name_prefix}-api" })
 }
 
 # Private integration to the ALB listener. Routing between services is the
@@ -81,5 +81,5 @@ resource "aws_apigatewayv2_stage" "default" {
     })
   }
 
-  tags = merge(local.common_tags, { service = "networking" })
+  tags = merge(local.common_tags, { service = "networking", Name = "${local.name_prefix}-api-default-stage" })
 }

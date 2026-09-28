@@ -96,11 +96,17 @@ done < <(jq -r '
 
 while IFS= read -r arn; do
   echo "BAD NAME      $arn"
-  echo "              does not contain the required prefix \"$PREFIX\""
+  echo "              neither the ARN nor the Name tag contains the required prefix \"$PREFIX\""
   violations=$((violations + 1))
 done < <(jq -r --arg prefix "$PREFIX" '
-  .ResourceTagMappingList[].ResourceARN
-  | select(contains($prefix) | not)
+  # ID-based resources (VPCs, subnets, security groups, route tables, NAT
+  # gateways, EIPs, KMS keys) have AWS-generated IDs in their ARN, so the
+  # prefix can never appear there; for those, the Name tag carries the name.
+  .ResourceTagMappingList[]
+  | ((.Tags // []) | map({key: .Key, value: .Value}) | from_entries) as $t
+  | select(((.ResourceARN | contains($prefix))
+            or (($t.Name // "") | contains($prefix))) | not)
+  | .ResourceARN
 ' <<<"$resources")
 
 echo
