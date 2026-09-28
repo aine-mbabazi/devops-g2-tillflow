@@ -347,11 +347,6 @@ script's own header for the exact command to run it for real):
   commands (Payments task stop, 7m23s recovery) into a repeatable script that
   additionally captures the alarm-history and Slack-delivery evidence the
   first run was missing. Writes `g4-platform-failure.json`.
-- `game-day/drill-05-restore.mjs` — re-runs the documented PITR restore end to
-  end, this time executing and capturing the reconciliation step
-  (`runbook.md#backup-and-restore` step 2) via `evidence/run-in-vpc.sh` +
-  `verify-restore.mjs`, and reporting whatever the real RTO/RPO numbers are.
-  Writes `g4-restore.json`.
 - `evidence/payments-integrity/capture-trace.mjs` — captures one real X-Ray
   trace for the sale→pay→callback path and one for a triggered Commission
   run, distilled into `g3-trace-payment.json` / `g3-trace-commission.json`.
@@ -378,13 +373,24 @@ executed pass.
   comfortably under it. See "Game day — drill 4" below and
   `docs/scar-log.md` for the full timeline; this is timed, executed evidence,
   but timed over budget, so it is not a passing Drill 4.
-- **Drill 5 (restore) was executed but is not a full pass.** An RDS
-  point-in-time restore completed in 35m 21s, exceeding the stated 30-minute
-  RTO target. The required post-restore provider-reference reconciliation was
-  not captured, so Drill 5 cannot be recorded as passing.
-- **RTO and RPO are asserted, not measured.** The 30-minute and 5-minute figures
-  are design intent derived from how the mechanisms work. Only the restore drill
-  converts them into evidence.
+- **Drill 5 (restore) is now a full mechanism pass, with both timing targets
+  measured and missed — see "Game day — drill 5" below.** Three attempts were
+  needed: the first two each hit a different real bug in the reconciliation
+  path (ECS JSON casing, then a missing `Pool` destructure) and never captured
+  reconciliation, though both produced valid RTO/RPO numbers on their own
+  (1757s/285s, then 1759s/411s). Two further bugs (a pretty-printed-JSON
+  parsing mismatch, and a per-record dump exceeding CloudWatch's per-event
+  size limit against 2,162 live rows) were caught and fixed via a 1-minute
+  smoke test before spending a third ~30-minute restore cycle. The third
+  attempt executed cleanly end to end: **RTO 1833s (30m33s) — missed by 33s;
+  RPO 483s (8m03s) — missed by 2m48s.** Both numbers are now measured, not
+  asserted, and neither meets target — reported as such rather than rounded
+  favorably.
+- **RTO and RPO are now measured, not asserted, for the restore path** — see
+  above. The other recovery objectives (platform failure, broken release)
+  have their own measured numbers in their respective sections; only the
+  restore drill converts *this* project's stated 30-minute/5-minute figures
+  into the actual RDS PITR numbers for this instance size.
 - **The external probe runs and is measured.** The original Synthetics canary
   could not be created: this account caps Lambda memory at 512 MB, while the
   provider requires 960 MB for `syn-nodejs-puppeteer-9.0`, so it stayed in
@@ -544,3 +550,44 @@ or different stability check) are in `docs/scar-log.md`.
 
 Revert of the intentional break: `services/pos/src/app.js` and
 `services/pos/test/pos.test.js` in this PR.
+
+## Game day — drill 5, 2026-09-28 (executed, mechanism pass, both targets missed)
+
+Restore, against the deployed stack. **Three attempts, four real bugs
+found and fixed**, full detail in
+[`game-day/drill-05-README.md`](game-day/drill-05-README.md):
+
+1. `drill-05-restore.mjs` read `networkConfiguration.awsvpcConfiguration.Subnets`
+   / `.SecurityGroups` — ECS's actual JSON casing is `subnets` /
+   `securityGroups`. Both were `undefined`; the reconciliation step crashed
+   before it could reach the network at all.
+2. `verify-restore.mjs` never destructured `Pool` from `pg` — `new Pool(...)`
+   threw `ReferenceError: Pool is not defined` inside the one-off ECS task,
+   with no useful output captured before the crash.
+3. `verify-restore.mjs` logged pretty-printed (multi-line) JSON; the
+   caller's parser picks "the line starting with `{`", which for
+   pretty-printed output is a lone `{` — incomplete JSON. Caught via a
+   1-minute smoke test against the live database, **before** spending a
+   third ~30-minute restore cycle on it.
+4. A full per-record dump (2,162 live `payment_attempts` rows) exceeded
+   CloudWatch's per-log-event size limit; reconstructing the split events
+   via `--output text` corrupted the JSON with stray control characters.
+   Fixed by summarizing (counts + a 10-record sample) instead. Also caught
+   by the same smoke test, same reason.
+
+**Third attempt: full mechanism pass.** Restore issued 22:02:24Z →
+available 22:32:57Z → reconciliation executed and captured (2,162 payment
+records checked against live state, all still `pending` — expected in
+`DARAJA_MODE=fake`, 0 payouts) → restore instance deleted → live instance
+confirmed untouched throughout. All 6 checks in `g4-restore.json` pass.
+
+**Both timing targets missed, reported honestly:**
+- **RTO: 1833s (30m33s)** vs. the 1800s (30-minute) target — 33 seconds over.
+- **RPO: 483s (8m03s)** vs. the 300s (5-minute) target — 2m48s over.
+
+The two earlier (reconciliation-incomplete) attempts produced their own
+valid RTO/RPO numbers — 1757s/285s (both under target) and 1759s/411s (RTO
+under, RPO over) — consistent with the third attempt's numbers rather than
+outliers, which is itself evidence: RDS PITR for this instance size
+clusters right around the 30-minute RTO line and tends to run over the
+5-minute RPO target, not comfortably under either.

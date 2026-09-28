@@ -31,7 +31,11 @@
 import { createRequire } from 'node:module';
 
 const require = createRequire('/app/services/payments/package.json');
-const pg = require('pg');
+// pg's CommonJS export is an object ({ Pool, Client, ... }), not a default
+// export named Pool — confirmed live on 2026-09-28 after `new Pool(...)`
+// below threw ReferenceError: Pool is not defined inside the ECS one-off
+// task, with no useful output captured before the crash.
+const { Pool } = require('pg');
 
 function requireEnv(name) {
   const value = process.env[name];
@@ -91,15 +95,31 @@ async function main() {
           resolved_since_restore_point: liveStatus !== 'pending' && liveStatus !== 'not_found_on_live',
         });
       }
+      // Summarized, not the full per-record list: the live database has
+      // accumulated thousands of rows across every k6/drill run this
+      // project has done, and a full record dump blows past CloudWatch's
+      // per-log-event size limit — the multi-event reconstruction on the
+      // way back out then corrupts the JSON with stray control characters
+      // at the split boundaries. Found live on 2026-09-28 against 2,162
+      // payment_attempts rows. Counts plus a bounded sample keep this
+      // readable and safely sized regardless of how large live data gets.
       result.reconciliation[key] = {
         pending_at_restore_point: pendingAtRestore.length,
         method: 'DARAJA_MODE=fake — re-queried against the live database\'s current record for each id, the fake-mode analog of re-querying the provider directly',
-        records: reconciled,
+        resolved_since_restore_point_count: reconciled.filter((r) => r.resolved_since_restore_point).length,
+        unresolved_count: reconciled.filter((r) => !r.resolved_since_restore_point).length,
+        sample: reconciled.slice(0, 10),
       };
       result.checks.push({ check: `every ${key} record pending at the restore point was re-checked against live state`, ok: true });
     }
 
-    console.log(JSON.stringify(result, null, 2));
+    // Compact, not pretty-printed: the caller (drill-05-restore.mjs) picks
+    // "the line starting with {" out of the CloudWatch-captured stdout to
+    // parse as JSON. A pretty-printed, multi-line stringify puts a lone "{"
+    // on its own first line, which is incomplete JSON and fails to parse —
+    // found live on 2026-09-28, the fix that would have followed the Pool
+    // bug above.
+    console.log(JSON.stringify(result));
     process.exitCode = 0;
   } catch (error) {
     console.error(JSON.stringify({ event: 'verify_restore_failed', message: error.message }));
