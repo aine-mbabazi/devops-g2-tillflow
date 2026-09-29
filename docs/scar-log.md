@@ -345,3 +345,109 @@ manages entirely for itself, resource-scoped to the group prefix, rather
 than itemizing one `events:` action at a time the way `GroupScopedBuckets`
 and `GroupScopedIAM` do for the two services where a wildcard would actually
 be dangerous.
+
+## 2026-09-29 — G5 rebuild: stale `imports.tf` blocks broke every from-scratch plan
+
+The first rebuild `terraform plan` after G5's destroy failed on all four S3
+buckets: `infra/main/imports.tf` still held the `import` blocks written for
+the 2026-09-20 drift fix (its own comment said "safe to remove once applied
+once main"), but nobody had removed them. Those buckets no longer existed
+post-destroy, so every plan tried to import resources that were gone.
+
+Fixed by deleting the file.
+
+Lesson: an `import` block is a one-time crutch, and its own comment named
+the exact moment it became safe to delete — but nothing enforced that, so it
+sat past its shelf life and blocked the next thing that actually needed a
+from-scratch apply to work, not just the apply it was written for.
+
+## 2026-09-29 — G5 rebuild: Secrets Manager soft-delete blocked recreation after destroy
+
+The rebuild apply failed creating all three managed secrets
+(`service-auth-secret`, `database-url`, `slack-webhook`): "already scheduled
+for deletion." `terraform destroy` only soft-deletes Secrets Manager
+secrets under AWS's default recovery window, and none of the three secret
+resources set `recovery_window_in_days = 0`. Force-purged with
+`aws secretsmanager delete-secret --force-delete-without-recovery` to
+unblock the rebuild.
+
+**Same failure class already scarred once, 2026-09-20** (S3 bucket drift
+blocking Infra Apply) — this is the same "destroy doesn't actually clear
+the resource" shape, on a different service. *Not fixed at the source in
+this PR* — follow-up: set `recovery_window_in_days = 0` on all three secret
+resources so the next teardown doesn't need this manual step again.
+
+Lesson: fixing one resource type's destroy-safety (S3, back in September)
+doesn't prove another type is destroy-safe too. A full from-scratch destroy
+→ rebuild cycle is the only thing that actually exercises every resource's
+teardown path at once, rather than one at a time as each happens to be
+touched.
+
+## 2026-09-29 — G5 rebuild: fresh RDS enforced SSL, no `pg.Pool` requested it — masked by liveness-only health checks
+
+Post-rebuild, POS's `/ready` returned 503 with `code: 28000` (Postgres
+auth error). Diagnosed via a one-off VPC task testing the secret value
+directly: not a password mismatch — `no pg_hba.conf entry for host ... no
+encryption`. The fresh RDS instance's default parameter group enforces SSL;
+none of the three services' `pg.Pool` construction ever requested it.
+
+**Payments and Web showed "healthy" throughout, which was misleading, not
+reassuring.** Their target groups poll `GET /health` — liveness only, no
+dependency check — so the identical defect was present in both but silently
+masked. Only POS's target group polls `/ready`, which actually touches the
+database.
+
+Fixed at the app layer, not by disabling RDS's own SSL enforcement: added
+`ssl: { rejectUnauthorized: false }` to every `new Pool(...)` call — all
+three services' `server.js`/`run.js` and all three `migrate.js` (six call
+sites). **This is a known trade-off, not a finished fix**: it gets an
+encrypted connection but does not verify the server certificate, so it is
+not protected against a machine-in-the-middle presenting a different cert
+within the VPC — encrypted, not authenticated. Follow-up: load the RDS CA
+bundle and switch to `ssl: { ca: <bundle>, rejectUnauthorized: true }`.
+
+Lesson: `/health` (liveness) and `/ready` (dependency-checked) polling the
+same-looking "healthy" target group tells two different stories, and a
+defect that only shows up in one of them will look fine everywhere the
+other is what's being watched. It also meant the fastest path to diagnosis
+was the service whose health check actually exercised the database, not
+the ones that merely looked fine.
+
+## 2026-09-29 — Post-rebuild: the alert-delivery watchdog re-triggered itself for 19 hours
+
+**What happened.** After G5, `devops-g2/slack-webhook` came back empty
+(Terraform never versions it, by design — populating it is a manual,
+out-of-band step). The watchdog alarm `devops-g2-alert-delivery-failing`
+was created at 03:35 EAT (00:35 UTC) 29 Sep and went to `ALARM` one minute
+later: its own `OK`→nothing notification failed on the empty secret. From
+there it flapped `ALARM` (~19 min) / `OK` (~1 min) on a roughly 20-minute
+cycle for exactly 19 hours, until 22:36 EAT (19:36 UTC). Every alert in the
+account was silent for that entire window — no Slack message was seen by
+anyone, including from the watchdog meant to catch exactly this.
+
+**Root cause.** The watchdog exists to detect a silently-failing notifier,
+but its own `ALARM`/`OK` notifications route through that same notifier.
+When Slack delivery is genuinely broken, the watchdog's attempt to say so
+is broken by the identical mechanism — so instead of surfacing the outage
+once, it re-evaluates, fails to notify, and re-triggers itself on every
+cycle. A self-triggering loop, not a flaky alarm.
+
+**Resolution.** A new webhook for #devops-group-2 was created and stored
+(the previous one was rotated after accidental exposure). Verified via
+`set-alarm-state` on `devops-g2-payments-5xx`: `alert_delivered` at
+19:35:23 UTC, `RECOVERED` at 19:36:45 UTC; the watchdog itself `RECOVERED`
+at 19:36:17 UTC once delivery worked again. Evidence, including the 113-
+entry alarm history and the notifier log showing all three deliveries:
+[`evidence/reliability-operations/alarms/post-rebuild-slack-test/`](../evidence/reliability-operations/alarms/post-rebuild-slack-test/README.md).
+
+**Follow-ups.** Route `alert-delivery-failing` to a separate non-Slack SNS
+topic (email), so it stays visible precisely when Slack itself is down —
+that's the one condition under which routing it through Slack can never
+work. Also make an empty webhook secret fail loudly at deploy/apply time
+instead of silently accepting it and only discovering the gap when an
+alarm actually fires.
+
+Lesson: a watchdog that shares a delivery path with the thing it watches
+isn't watching it — it's an echo of the same failure. Guarding against a
+notifier outage means the guard's own alert has to survive that exact
+outage, which by definition means it cannot use the same channel.

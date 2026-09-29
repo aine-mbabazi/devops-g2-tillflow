@@ -1,0 +1,3 @@
+2026-09-29T19:35:23 2026-09-29T19:35:23.022Z	b4f6cc7d-bf3a-4207-b549-75c96a93872a	INFO	{"event":"alert_delivered","alarm":"devops-g2-payments-5xx","state":"ALARM"}
+2026-09-29T19:36:18 2026-09-29T19:36:18.822Z	03096aff-efd7-4c8a-9603-08e756accf95	INFO	{"event":"alert_delivered","alarm":"devops-g2-alert-delivery-failing","state":"OK"}
+2026-09-29T19:36:45 2026-09-29T19:36:45.982Z	178790a5-e719-4465-ad8d-9606369e316f	INFO	{"event":"alert_delivered","alarm":"devops-g2-payments-5xx","state":"OK"}

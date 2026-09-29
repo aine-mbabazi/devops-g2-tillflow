@@ -196,12 +196,10 @@ minute, so it stays; dropping to five minutes would cost ~$10 instead of
 [`docs/capacity-model.md`](docs/capacity-model.md) argues that trade in full
 rather than leaving it an accident.
 
-As of 2026-09-21, the probe itself is mid-rollout, not yet costing anything:
-`synthetic_probe_url` was wired into `infra-apply.yml` (PR #72), which
-surfaced one more missing apply-role permission (`s3:GetBucketAcl`, PR #73,
-same shape as every other itemized-permission gap in `docs/scar-log.md`).
-Once that merges and applies cleanly, the ~$52/month starts accruing — worth
-remembering when comparing an actual bill against this estimate later.
+The probe has been running since 2026-09-21 (9,819 invocations over 7 days,
+99.99% success — [`evidence/reliability-operations/probe/`](evidence/reliability-operations/probe/)),
+so the ~$52/month has been accruing since then, not a still-pending line
+item — worth remembering when comparing an actual bill against this estimate.
 
 The NAT gateway is the other line worth attention: VPC endpoints for ECR and
 Secrets Manager would cut its data-processing charges, though not its hourly
@@ -211,12 +209,15 @@ Costs stop when the stack is destroyed — see [Destroy](#destroy-cost-control--
 
 ## Cleanup status
 
-**Currently provisioned, live, as of 2026-09-21** (confirmed against actual
+**Currently provisioned, live, as of 2026-09-29** (confirmed against actual
 `infra-apply` run logs, not just merged PRs — several docs in this repo had
 gone stale claiming otherwise):
 
 - VPC, ALB (internal), NAT Gateway (single), API Gateway + VPC Link as the
-  public entry point (`api_gateway_invoke_url` output, live since 2026-09-18).
+  public entry point (`api_gateway_invoke_url` output). The API Gateway is a
+  new resource as of G5 (destroyed and rebuilt 2026-09-28/29, see below) —
+  live at the current URL since 2026-09-29, not the original 2026-09-18
+  gateway, which no longer exists.
 - RDS PostgreSQL (single-AZ `db.t4g.micro`).
 - ElastiCache (Valkey, `cache.t4g.micro`, single node) and the SQS
   reconciliation queue + DLQ — both live, despite earlier evidence docs
@@ -229,11 +230,13 @@ gone stale claiming otherwise):
   bootstrap state backend bucket + DynamoDB lock table (`infra/bootstrap`).
 - CloudWatch logs, alarms, IAM roles, OIDC CI/CD roles.
 
-**Mid-rollout:** the external synthetic probe (canary + its own S3 bucket)
-is wired but not yet applying cleanly — PR #72 set `synthetic_probe_url`,
-which surfaced a missing apply-role permission fixed in PR #73
-(`s3:GetBucketAcl`). Once both merge and an apply succeeds, the canary
-becomes the largest line item in [Cost](#cost) above.
+**Synthetic probe: live and measured, not mid-rollout.** The probe (an
+EventBridge-scheduled Lambda, not the originally-planned Synthetics canary —
+this account caps Lambda memory below what a canary requires) has run every
+minute since 2026-09-21: 9,819 invocations over 7 days at 99.99% success. It
+was re-pointed at the new API Gateway URL and re-confirmed running after G5.
+It is now the largest line item in [Cost](#cost) above. See
+[`evidence/reliability-operations/probe/`](evidence/reliability-operations/probe/).
 
 **Now exercised (G5, 2026-09-28/29):** a full `terraform destroy` + rebuild
 cycle for the current 157-resource stack. Destroy: 12m05s. Rebuild to a
