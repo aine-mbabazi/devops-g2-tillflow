@@ -1,0 +1,68 @@
+{
+  "drill": "devops-g2-platform-failure",
+  "set_alarm_state": false,
+  "injection": {
+    "kind": "revoke_rds_security_group_ingress",
+    "note": "Prior versions of this drill stopped the Payments ECS task (a graceful ECS deregistration) and never tripped an alarm — structural, not a fluke: confirmed live on 2026-09-28. This is the runbook's own second suggested injection, targeting POS via its dependency-aware /ready check.",
+    "rds_security_group": "sg-0eca10397783cc6af",
+    "ecs_tasks_security_group": "sg-0873df4bf96577c6c",
+    "port": 5432,
+    "revoked_at": "2026-09-28T20:32:08.057Z",
+    "restored_at": "2026-09-28T20:37:47.736Z"
+  },
+  "alarm": {
+    "name": "devops-g2-pos-unhealthy-targets",
+    "ok_to_alarm": "2026-09-28T23:37:19.853000+03:00",
+    "alarm_to_ok": "2026-09-28T23:41:19.852000+03:00",
+    "alarm_reason": "Alarm updated from OK to ALARM",
+    "ok_reason": "Alarm updated from ALARM to OK"
+  },
+  "slack_lambda": {
+    "log_group": "/aws/lambda/devops-g2-slack-notifier",
+    "firing": {
+      "event": "alert_delivered",
+      "alarm": "devops-g2-pos-unhealthy-targets",
+      "state": "ALARM"
+    },
+    "recovered": {
+      "event": "alert_delivered",
+      "alarm": "devops-g2-pos-unhealthy-targets",
+      "state": "OK"
+    }
+  },
+  "rto": {
+    "seconds": 409,
+    "target_seconds": 1800,
+    "met": true
+  },
+  "checks": [
+    {
+      "check": "RDS ingress revoked",
+      "ok": true
+    },
+    {
+      "check": "alarm fired from a real condition, no set-alarm-state",
+      "ok": true
+    },
+    {
+      "check": "Slack delivered the firing alert",
+      "ok": true
+    },
+    {
+      "check": "RDS ingress restored",
+      "ok": true
+    },
+    {
+      "check": "POS target group recovered without a task restart",
+      "ok": true
+    },
+    {
+      "check": "alarm recovered to OK",
+      "ok": true
+    },
+    {
+      "check": "Slack delivered the recovery alert",
+      "ok": true
+    }
+  ]
+}
