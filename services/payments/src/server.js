@@ -28,8 +28,12 @@ async function start() {
     // would take out every endpoint, not just the one that issued the query.
     // query_timeout is the one that tears the connection down client-side;
     // statement_timeout would not help, since the server never receives it.
+    // RDS Postgres 16's default parameter group enforces rds.force_ssl; see
+    // services/pos/src/server.js for why rejectUnauthorized: false is used
+    // instead of an sslmode connection-string param.
     pool = new Pool({
       connectionString: config.databaseUrl,
+      ssl: { rejectUnauthorized: false },
       connectionTimeoutMillis: 2000,
       query_timeout: 2000,
     });

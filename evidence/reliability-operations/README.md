@@ -336,13 +336,6 @@ explanation and these are the places where neither yet exists.
 yet** (this pass had no AWS credentials available to run it — see each
 script's own header for the exact command to run it for real):
 
-- `game-day/drill-06-abandoned-payment.mjs` — a live-infra alarm-firing→recovery
-  drill. Confirmed by reading the deployed code paths (not asserted): the
-  deployed Payments task runs `DARAJA_MODE=fake`, so a payment created against
-  the real API Gateway with its callback deliberately withheld lands in the
-  reconciliation DLQ through nothing but ordinary API calls, tripping
-  `devops-g2-reconciliation-dlq-not-empty` for real — no `set-alarm-state`
-  involved. Writes `g3-alarm-firing.json`.
 - `evidence/payments-integrity/capture-trace.mjs` — captures one real X-Ray
   trace for the sale→pay→callback path and one for a triggered Commission
   run, distilled into `g3-trace-payment.json` / `g3-trace-commission.json`.
@@ -506,9 +499,9 @@ stores on an ephemeral local server, not the deployed ECS/RDS stack — same
 caveat as the k6 capacity runs above. They prove the invariants hold in the
 real code; they do not prove the deployed infrastructure carries them
 through. Drills 3–6 needed the live stack; drill 3 is now a full pass (see
-"Game day — drill 3" below), drill 6 is a full pass as of PR #101
-(`evidence(g4): drill 6 abandoned-payment/DLQ, executed against deployed
-infra`), and drill 5 is still open (see "Not yet proven" above).
+"Game day — drill 3" below), drill 6 is a full pass (see "Game day — drill 6"
+below), and drill 5 is now a full mechanism pass with both timing targets
+measured and missed narrowly (see "Game day — drill 5" below).
 
 **Moving these two to the deployed edge was attempted on 2026-09-28 and
 found structurally blocked, not just unattempted.** `DARAJA_MODE=fake` on
@@ -628,3 +621,35 @@ under, RPO over) — consistent with the third attempt's numbers rather than
 outliers, which is itself evidence: RDS PITR for this instance size
 clusters right around the 30-minute RTO line and tends to run over the
 5-minute RPO target, not comfortably under either.
+
+## Game day — drill 6, 2026-09-28 (executed, pass)
+
+Abandoned payment / DLQ recovery, against the deployed stack — never run
+before this pass. Created one real payment over the real API Gateway
+(tenant `load-tenant`) and deliberately withheld its callback.
+
+Two real defects surfaced getting this to run, both fixed in the same pass
+rather than worked around — full detail in
+[`game-day/drill-06-README.md`](game-day/drill-06-README.md):
+
+1. The original claim that an abandoned payment reaches the reconciliation
+   queue "through nothing but ordinary API calls" was **wrong**: `app.js`
+   only enqueues on a dispatch *failure*, and `FakeDarajaClient` never
+   fails. Fixed by manually seeding the real queue with the message
+   `app.js` itself would send — a documented substitution, not a
+   `set-alarm-state` shortcut. Everything after that injection point (real
+   consumer, real redelivery, real DLQ, real alarm, real Slack) is genuine.
+2. `tryParse()` broke on CloudWatch's Lambda-console log format (a
+   `<timestamp>\t<requestId>\t<level>\t` prefix before the JSON payload),
+   so the live Slack-delivery confirmation timed out even though delivery
+   had genuinely happened 8 seconds after the alarm fired. Fixed by
+   slicing to the first `{` before parsing — **and the identical bug was
+   fixed in `drill-03-platform-failure.mjs` before it could waste the same
+   10 minutes there too.**
+
+**Result:** alarm fired for real at 19:36:09Z, Slack delivered the firing
+alert, the DLQ message was confirmed and deleted per
+`docs/runbook.md#reconciliation-dlq` (not redriven — permanently
+unresolvable in `DARAJA_MODE=fake`), the alarm recovered to `OK` 5m55s
+after the fix (consistent with its 5-minute evaluation period), and Slack
+delivered the recovery alert. All 7 checks in `g3-alarm-firing.json` pass.

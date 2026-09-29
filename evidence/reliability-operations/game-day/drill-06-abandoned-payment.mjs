@@ -8,7 +8,9 @@
 // and the Slack notifier Lambda's own log timestamps can be cross-checked
 // against each other rather than asserted.
 //
-// Mechanism, confirmed by reading the live code paths before writing this:
+// Mechanism, confirmed by reading the live code paths before writing this —
+// and corrected once, on 2026-09-28, after the first live run disproved part
+// of the original claim below:
 //   - The deployed Payments task runs DARAJA_MODE=fake (infra/main/payments-task.tf),
 //     so POST /payments against the real API Gateway dispatches through the
 //     same FakeDarajaClient as local dev and gets back a real providerRequestId
@@ -17,8 +19,37 @@
 //     which returns "pending" forever unless FakeDarajaClient#simulateOutcome
 //     was called — and that method is JS-only, never reachable over HTTP. So a
 //     payment created this way can NEVER be resolved through the public
-//     callback endpoint. That is not a bug being exploited; it is what makes
-//     "leave it alone" a completely deterministic way to reach the DLQ.
+//     callback endpoint. That part is confirmed correct.
+//   - What the original version of this script got WRONG: it assumed an
+//     abandoned-but-dispatched payment would eventually reach the
+//     reconciliation queue on its own. It does not. app.js only calls
+//     `reconciliationQueue.enqueue()` from the catch block around
+//     `initiateStkPush` — i.e. when the DISPATCH itself fails
+//     (provider_dispatch_unconfirmed). FakeDarajaClient#initiateStkPush never
+//     throws for valid input, so a plain POST /payments that is simply never
+//     confirmed NEVER gets enqueued at all — confirmed live on 2026-09-28:
+//     both devops-g2-reconciliation and its DLQ sat at 0 messages, and the
+//     dlq-not-empty alarm had only ever been OK, after the drill's payment
+//     had been sitting pending for several minutes. There is no scheduled
+//     sweep that enqueues stale-pending payments either.
+//   - This is the identical structural blocker documented for drills 1 & 2
+//     against the deployed edge (see game-day/drill-01-02-README.md): fake
+//     mode gives no HTTP-reachable way to make a dispatch fail. The fix
+//     applied here, consistent with the "no code change to fake-client.js"
+//     decision made for drills 1 & 2: manually seed the REAL
+//     devops-g2-reconciliation queue with the exact message shape app.js
+//     itself would produce on a dispatch failure
+//     (`{"type":"payment","id":"<paymentId>"}`), pointed at the payment this
+//     drill just created over real HTTP. Everything downstream of that one
+//     injection point is genuine: the actually-deployed consumer polls it,
+//     actually refuses to resolve it (queryPayment returns "pending"
+//     forever), SQS actually redelivers it 5 times and moves it to the real
+//     DLQ, the real CloudWatch alarm fires off the real metric, and Slack
+//     actually delivers. Never `set-alarm-state` — same rule as always; this
+//     substitutes only the one step (organic dispatch-failure enqueue) that
+//     fake mode makes structurally unreachable over HTTP, the same way
+//     verify-restore.mjs names its own fake-mode substitution rather than
+//     hiding it.
 //   - After 5 redeliveries over the 60s visibility timeout, the message lands
 //     in devops-g2-reconciliation-dlq, tripping devops-g2-reconciliation-dlq-not-empty
 //     (threshold 0) for real.
@@ -38,6 +69,7 @@
 //   export SERVICE_AUTH_SECRET=<real value, from Secrets Manager>
 //   export TENANT_ID=<a tenant configured in the deployed stack>
 //   export DLQ_URL=$(cd infra/main && terraform output -raw reconciliation_dlq_url)
+//   export QUEUE_URL=$(cd infra/main && terraform output -raw reconciliation_queue_url)
 //   node evidence/reliability-operations/game-day/drill-06-abandoned-payment.mjs \
 //     > evidence/reliability-operations/game-day/drill-06-transcript.jsonl
 
@@ -49,6 +81,7 @@ const API_URL = requireEnv('API_URL');
 const SERVICE_AUTH_SECRET = requireEnv('SERVICE_AUTH_SECRET');
 const TENANT_ID = requireEnv('TENANT_ID');
 const DLQ_URL = requireEnv('DLQ_URL');
+const QUEUE_URL = requireEnv('QUEUE_URL');
 const REGION = process.env.AWS_REGION || 'us-east-2';
 const ALARM_NAME = process.env.ALARM_NAME || 'devops-g2-reconciliation-dlq-not-empty';
 const SLACK_LOG_GROUP = process.env.SLACK_LOG_GROUP || '/aws/lambda/devops-g2-slack-notifier';
@@ -124,11 +157,23 @@ async function main() {
   const paymentId = createdBody.payment_id;
   log({ event: 'drill_assertion', step: 1, result: 'pass', paymentId, detail: 'payment dispatched, pending, callback withheld on purpose' });
 
+  // Step 1b: seed the REAL reconciliation queue by hand, with the exact
+  // message shape app.js itself produces on a dispatch failure. Required
+  // because DARAJA_MODE=fake means initiateStkPush never throws, so an
+  // abandoned-but-dispatched payment has no HTTP-reachable path into the
+  // queue at all — confirmed live on 2026-09-28 (see header comment). Not a
+  // set-alarm-state shortcut: everything from here on — consumer, redelivery,
+  // DLQ, alarm, Slack — is the real deployed mechanism reacting to a real
+  // queue message.
+  log({ event: 'drill_step', step: '1b', description: `manually seeding devops-g2-reconciliation with the message app.js would have sent on a dispatch failure — organic enqueue is unreachable over HTTP in DARAJA_MODE=fake` });
+  aws(['sqs', 'send-message', '--queue-url', QUEUE_URL, '--message-body', JSON.stringify({ type: 'payment', id: paymentId })]);
+  log({ event: 'drill_assertion', step: '1b', result: 'pass', detail: 'reconciliation message sent for ' + paymentId });
+
   // Step 2: wait for the message to age out of the main queue and land in the DLQ.
   log({ event: 'drill_step', step: 2, description: `waiting for the reconciliation message for ${paymentId} to land in the DLQ (up to 5 redeliveries over the 60s visibility timeout)` });
   const dlqLandedAt = await pollUntil(DLQ_POLL_DEADLINE_MS, DLQ_POLL_INTERVAL_MS, `message for ${paymentId} visible in the DLQ`, () => {
-    const attrs = aws(['sqs', 'get-queue-attributes', '--queue-url', DLQ_URL, '--attribute-names', 'ApproximateNumberOfMessagesVisible']);
-    const count = Number(attrs?.Attributes?.ApproximateNumberOfMessagesVisible ?? 0);
+    const attrs = aws(['sqs', 'get-queue-attributes', '--queue-url', DLQ_URL, '--attribute-names', 'ApproximateNumberOfMessages']);
+    const count = Number(attrs?.Attributes?.ApproximateNumberOfMessages ?? 0);
     if (count >= 1) return new Date().toISOString();
     return null;
   });
@@ -184,6 +229,7 @@ async function main() {
   const summary = {
     drill: 'devops-g2-abandoned-payment',
     set_alarm_state: false,
+    substitution: 'DARAJA_MODE=fake gives no HTTP-reachable way to make initiateStkPush fail, so the reconciliation message was seeded manually onto the live devops-g2-reconciliation queue (same shape app.js sends on a real dispatch failure) rather than being produced organically by an abandoned payment. Everything from that point on — consumer, redelivery, DLQ, alarm, Slack — is the real deployed mechanism.',
     payment_id: paymentId,
     sale_id: saleId,
     tenant_id: TENANT_ID,
@@ -218,8 +264,15 @@ async function main() {
   log({ event: 'drill_completed', drill: 'abandoned-payment', result: 'pass' });
 }
 
+// Lambda console-log lines in CloudWatch are prefixed with
+// "<timestamp>\t<requestId>\t<level>\t" before the JSON payload the code
+// actually logged — not pure JSON on their own. Slicing to the first "{"
+// strips that prefix; a raw JSON string (e.g. an SQS message body) already
+// starts with "{" so this is a no-op for those callers.
 function tryParse(text) {
-  try { return JSON.parse(text); } catch { return null; }
+  const start = text.indexOf('{');
+  if (start === -1) return null;
+  try { return JSON.parse(text.slice(start)); } catch { return null; }
 }
 
 main().catch((error) => {

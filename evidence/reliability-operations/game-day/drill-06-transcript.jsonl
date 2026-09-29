@@ -1,0 +1,100 @@
+{"ts":"2026-09-28T19:29:03.108Z","event":"drill_started","drill":"abandoned-payment","api":"https://exykmqaubj.execute-api.us-east-2.amazonaws.com","tenant":"load-tenant"}
+{"ts":"2026-09-28T19:29:03.110Z","event":"drill_step","step":1,"description":"POST /payments — dispatch a payment we will never confirm"}
+{"ts":"2026-09-28T19:29:04.541Z","event":"drill_assertion","step":1,"result":"pass","paymentId":"payment_7489c426-2cd2-482f-adef-a7428f5fa59e","detail":"payment dispatched, pending, callback withheld on purpose"}
+{"ts":"2026-09-28T19:29:04.541Z","event":"drill_step","step":"1b","description":"manually seeding devops-g2-reconciliation with the message app.js would have sent on a dispatch failure — organic enqueue is unreachable over HTTP in DARAJA_MODE=fake"}
+{"ts":"2026-09-28T19:29:06.136Z","event":"drill_assertion","step":"1b","result":"pass","detail":"reconciliation message sent for payment_7489c426-2cd2-482f-adef-a7428f5fa59e"}
+{"ts":"2026-09-28T19:29:06.136Z","event":"drill_step","step":2,"description":"waiting for the reconciliation message for payment_7489c426-2cd2-482f-adef-a7428f5fa59e to land in the DLQ (up to 5 redeliveries over the 60s visibility timeout)"}
+{"ts":"2026-09-28T19:29:07.705Z","event":"poll_waiting","description":"message for payment_7489c426-2cd2-482f-adef-a7428f5fa59e visible in the DLQ","elapsedMs":1569}
+{"ts":"2026-09-28T19:29:24.277Z","event":"poll_waiting","description":"message for payment_7489c426-2cd2-482f-adef-a7428f5fa59e visible in the DLQ","elapsedMs":18141}
+{"ts":"2026-09-28T19:29:40.842Z","event":"poll_waiting","description":"message for payment_7489c426-2cd2-482f-adef-a7428f5fa59e visible in the DLQ","elapsedMs":34706}
+{"ts":"2026-09-28T19:29:57.426Z","event":"poll_waiting","description":"message for payment_7489c426-2cd2-482f-adef-a7428f5fa59e visible in the DLQ","elapsedMs":51290}
+{"ts":"2026-09-28T19:30:13.978Z","event":"poll_waiting","description":"message for payment_7489c426-2cd2-482f-adef-a7428f5fa59e visible in the DLQ","elapsedMs":67842}
+{"ts":"2026-09-28T19:30:30.515Z","event":"poll_waiting","description":"message for payment_7489c426-2cd2-482f-adef-a7428f5fa59e visible in the DLQ","elapsedMs":84379}
+{"ts":"2026-09-28T19:30:47.172Z","event":"poll_waiting","description":"message for payment_7489c426-2cd2-482f-adef-a7428f5fa59e visible in the DLQ","elapsedMs":101036}
+{"ts":"2026-09-28T19:31:03.795Z","event":"poll_waiting","description":"message for payment_7489c426-2cd2-482f-adef-a7428f5fa59e visible in the DLQ","elapsedMs":117659}
+{"ts":"2026-09-28T19:31:20.363Z","event":"poll_waiting","description":"message for payment_7489c426-2cd2-482f-adef-a7428f5fa59e visible in the DLQ","elapsedMs":134227}
+{"ts":"2026-09-28T19:31:37.040Z","event":"poll_waiting","description":"message for payment_7489c426-2cd2-482f-adef-a7428f5fa59e visible in the DLQ","elapsedMs":150904}
+{"ts":"2026-09-28T19:31:53.723Z","event":"poll_waiting","description":"message for payment_7489c426-2cd2-482f-adef-a7428f5fa59e visible in the DLQ","elapsedMs":167587}
+{"ts":"2026-09-28T19:32:10.303Z","event":"poll_waiting","description":"message for payment_7489c426-2cd2-482f-adef-a7428f5fa59e visible in the DLQ","elapsedMs":184167}
+{"ts":"2026-09-28T19:32:26.840Z","event":"poll_waiting","description":"message for payment_7489c426-2cd2-482f-adef-a7428f5fa59e visible in the DLQ","elapsedMs":200704}
+{"ts":"2026-09-28T19:32:43.395Z","event":"poll_waiting","description":"message for payment_7489c426-2cd2-482f-adef-a7428f5fa59e visible in the DLQ","elapsedMs":217259}
+{"ts":"2026-09-28T19:32:59.969Z","event":"poll_waiting","description":"message for payment_7489c426-2cd2-482f-adef-a7428f5fa59e visible in the DLQ","elapsedMs":233833}
+{"ts":"2026-09-28T19:33:16.532Z","event":"poll_waiting","description":"message for payment_7489c426-2cd2-482f-adef-a7428f5fa59e visible in the DLQ","elapsedMs":250396}
+{"ts":"2026-09-28T19:33:33.079Z","event":"poll_waiting","description":"message for payment_7489c426-2cd2-482f-adef-a7428f5fa59e visible in the DLQ","elapsedMs":266943}
+{"ts":"2026-09-28T19:33:49.773Z","event":"poll_waiting","description":"message for payment_7489c426-2cd2-482f-adef-a7428f5fa59e visible in the DLQ","elapsedMs":283637}
+{"ts":"2026-09-28T19:34:06.319Z","event":"drill_assertion","step":2,"result":"pass","dlqLandedAt":"2026-09-28T19:34:06.319Z","detail":"DLQ has at least one visible message"}
+{"ts":"2026-09-28T19:34:06.319Z","event":"drill_step","step":3,"description":"waiting for devops-g2-reconciliation-dlq-not-empty OK -> ALARM in its real history"}
+{"ts":"2026-09-28T19:34:12.941Z","event":"poll_waiting","description":"devops-g2-reconciliation-dlq-not-empty ALARM transition","elapsedMs":6622}
+{"ts":"2026-09-28T19:34:29.540Z","event":"poll_waiting","description":"devops-g2-reconciliation-dlq-not-empty ALARM transition","elapsedMs":23221}
+{"ts":"2026-09-28T19:34:46.146Z","event":"poll_waiting","description":"devops-g2-reconciliation-dlq-not-empty ALARM transition","elapsedMs":39827}
+{"ts":"2026-09-28T19:35:02.717Z","event":"poll_waiting","description":"devops-g2-reconciliation-dlq-not-empty ALARM transition","elapsedMs":56398}
+{"ts":"2026-09-28T19:35:19.440Z","event":"poll_waiting","description":"devops-g2-reconciliation-dlq-not-empty ALARM transition","elapsedMs":73121}
+{"ts":"2026-09-28T19:35:36.026Z","event":"poll_waiting","description":"devops-g2-reconciliation-dlq-not-empty ALARM transition","elapsedMs":89707}
+{"ts":"2026-09-28T19:35:53.033Z","event":"poll_waiting","description":"devops-g2-reconciliation-dlq-not-empty ALARM transition","elapsedMs":106714}
+{"ts":"2026-09-28T19:36:09.752Z","event":"drill_assertion","step":3,"result":"pass","alarmTimestamp":"2026-09-28T22:36:08.976000+03:00","historySummary":"Alarm updated from OK to ALARM"}
+{"ts":"2026-09-28T19:36:09.752Z","event":"drill_step","step":4,"description":"confirming Slack Lambda delivery for the firing alarm"}
+{"ts":"2026-09-28T19:36:11.459Z","event":"poll_waiting","description":"Slack notifier ALARM delivery log line","elapsedMs":1707}
+{"ts":"2026-09-28T19:36:28.790Z","event":"poll_waiting","description":"Slack notifier ALARM delivery log line","elapsedMs":19038}
+{"ts":"2026-09-28T19:36:45.830Z","event":"poll_waiting","description":"Slack notifier ALARM delivery log line","elapsedMs":36078}
+{"ts":"2026-09-28T19:37:02.937Z","event":"poll_waiting","description":"Slack notifier ALARM delivery log line","elapsedMs":53185}
+{"ts":"2026-09-28T19:37:33.174Z","event":"poll_waiting","description":"Slack notifier ALARM delivery log line","elapsedMs":83422}
+{"ts":"2026-09-28T19:37:50.227Z","event":"poll_waiting","description":"Slack notifier ALARM delivery log line","elapsedMs":100475}
+{"ts":"2026-09-28T19:38:07.452Z","event":"poll_waiting","description":"Slack notifier ALARM delivery log line","elapsedMs":117700}
+{"ts":"2026-09-28T19:38:24.542Z","event":"poll_waiting","description":"Slack notifier ALARM delivery log line","elapsedMs":134790}
+{"ts":"2026-09-28T19:38:41.623Z","event":"poll_waiting","description":"Slack notifier ALARM delivery log line","elapsedMs":151871}
+{"ts":"2026-09-28T19:39:00.798Z","event":"poll_waiting","description":"Slack notifier ALARM delivery log line","elapsedMs":171046}
+{"ts":"2026-09-28T19:39:17.876Z","event":"poll_waiting","description":"Slack notifier ALARM delivery log line","elapsedMs":188124}
+{"ts":"2026-09-28T19:39:34.952Z","event":"poll_waiting","description":"Slack notifier ALARM delivery log line","elapsedMs":205200}
+{"ts":"2026-09-28T19:39:52.229Z","event":"poll_waiting","description":"Slack notifier ALARM delivery log line","elapsedMs":222477}
+{"ts":"2026-09-28T19:40:09.364Z","event":"poll_waiting","description":"Slack notifier ALARM delivery log line","elapsedMs":239612}
+{"ts":"2026-09-28T19:40:26.436Z","event":"poll_waiting","description":"Slack notifier ALARM delivery log line","elapsedMs":256684}
+{"ts":"2026-09-28T19:40:43.476Z","event":"poll_waiting","description":"Slack notifier ALARM delivery log line","elapsedMs":273724}
+{"ts":"2026-09-28T19:41:00.823Z","event":"poll_waiting","description":"Slack notifier ALARM delivery log line","elapsedMs":291071}
+{"ts":"2026-09-28T19:41:18.387Z","event":"poll_waiting","description":"Slack notifier ALARM delivery log line","elapsedMs":308635}
+{"ts":"2026-09-28T19:41:35.642Z","event":"poll_waiting","description":"Slack notifier ALARM delivery log line","elapsedMs":325890}
+{"ts":"2026-09-28T19:41:52.733Z","event":"poll_waiting","description":"Slack notifier ALARM delivery log line","elapsedMs":342981}
+{"ts":"2026-09-28T19:42:09.805Z","event":"poll_waiting","description":"Slack notifier ALARM delivery log line","elapsedMs":360053}
+{"ts":"2026-09-28T19:42:27.005Z","event":"poll_waiting","description":"Slack notifier ALARM delivery log line","elapsedMs":377253}
+{"ts":"2026-09-28T19:42:44.152Z","event":"poll_waiting","description":"Slack notifier ALARM delivery log line","elapsedMs":394400}
+{"ts":"2026-09-28T19:43:01.248Z","event":"poll_waiting","description":"Slack notifier ALARM delivery log line","elapsedMs":411496}
+{"ts":"2026-09-28T19:43:18.326Z","event":"poll_waiting","description":"Slack notifier ALARM delivery log line","elapsedMs":428574}
+{"ts":"2026-09-28T19:43:35.401Z","event":"poll_waiting","description":"Slack notifier ALARM delivery log line","elapsedMs":445649}
+{"ts":"2026-09-28T19:43:52.566Z","event":"poll_waiting","description":"Slack notifier ALARM delivery log line","elapsedMs":462814}
+{"ts":"2026-09-28T19:44:09.623Z","event":"poll_waiting","description":"Slack notifier ALARM delivery log line","elapsedMs":479871}
+{"ts":"2026-09-28T19:44:26.752Z","event":"poll_waiting","description":"Slack notifier ALARM delivery log line","elapsedMs":497000}
+{"ts":"2026-09-28T19:44:44.017Z","event":"poll_waiting","description":"Slack notifier ALARM delivery log line","elapsedMs":514265}
+{"ts":"2026-09-28T19:45:01.524Z","event":"poll_waiting","description":"Slack notifier ALARM delivery log line","elapsedMs":531772}
+{"ts":"2026-09-28T19:45:18.797Z","event":"poll_waiting","description":"Slack notifier ALARM delivery log line","elapsedMs":549045}
+{"ts":"2026-09-28T19:45:36.075Z","event":"poll_waiting","description":"Slack notifier ALARM delivery log line","elapsedMs":566323}
+{"ts":"2026-09-28T19:45:53.150Z","event":"poll_waiting","description":"Slack notifier ALARM delivery log line","elapsedMs":583398}
+{"ts":"2026-09-28T19:46:10.252Z","event":"poll_waiting","description":"Slack notifier ALARM delivery log line","elapsedMs":600500}
+{"ts":"2026-09-28T20:02:10.717Z","event":"drill_resumed","drill":"abandoned-payment","from_step":5,"paymentId":"payment_7489c426-2cd2-482f-adef-a7428f5fa59e"}
+{"ts":"2026-09-28T20:02:10.720Z","event":"drill_step","step":5,"description":"reading and resolving the DLQ message (first safe action, not a redrive)"}
+{"ts":"2026-09-28T20:02:13.830Z","event":"drill_assertion","step":5,"result":"pass","detail":"confirmed message belongs to this drill's own payment, deleted per runbook (not redriven)"}
+{"ts":"2026-09-28T20:02:13.830Z","event":"drill_step","step":6,"description":"waiting for devops-g2-reconciliation-dlq-not-empty ALARM -> OK"}
+{"ts":"2026-09-28T20:02:15.398Z","event":"poll_waiting","description":"devops-g2-reconciliation-dlq-not-empty OK transition","elapsedMs":1568}
+{"ts":"2026-09-28T20:02:31.995Z","event":"poll_waiting","description":"devops-g2-reconciliation-dlq-not-empty OK transition","elapsedMs":18165}
+{"ts":"2026-09-28T20:02:48.618Z","event":"poll_waiting","description":"devops-g2-reconciliation-dlq-not-empty OK transition","elapsedMs":34788}
+{"ts":"2026-09-28T20:03:05.178Z","event":"poll_waiting","description":"devops-g2-reconciliation-dlq-not-empty OK transition","elapsedMs":51348}
+{"ts":"2026-09-28T20:03:21.919Z","event":"poll_waiting","description":"devops-g2-reconciliation-dlq-not-empty OK transition","elapsedMs":68089}
+{"ts":"2026-09-28T20:03:38.544Z","event":"poll_waiting","description":"devops-g2-reconciliation-dlq-not-empty OK transition","elapsedMs":84714}
+{"ts":"2026-09-28T20:03:55.130Z","event":"poll_waiting","description":"devops-g2-reconciliation-dlq-not-empty OK transition","elapsedMs":101300}
+{"ts":"2026-09-28T20:04:11.729Z","event":"poll_waiting","description":"devops-g2-reconciliation-dlq-not-empty OK transition","elapsedMs":117899}
+{"ts":"2026-09-28T20:04:28.355Z","event":"poll_waiting","description":"devops-g2-reconciliation-dlq-not-empty OK transition","elapsedMs":134525}
+{"ts":"2026-09-28T20:04:44.908Z","event":"poll_waiting","description":"devops-g2-reconciliation-dlq-not-empty OK transition","elapsedMs":151078}
+{"ts":"2026-09-28T20:05:01.504Z","event":"poll_waiting","description":"devops-g2-reconciliation-dlq-not-empty OK transition","elapsedMs":167674}
+{"ts":"2026-09-28T20:05:18.081Z","event":"poll_waiting","description":"devops-g2-reconciliation-dlq-not-empty OK transition","elapsedMs":184251}
+{"ts":"2026-09-28T20:05:34.635Z","event":"poll_waiting","description":"devops-g2-reconciliation-dlq-not-empty OK transition","elapsedMs":200805}
+{"ts":"2026-09-28T20:05:51.215Z","event":"poll_waiting","description":"devops-g2-reconciliation-dlq-not-empty OK transition","elapsedMs":217385}
+{"ts":"2026-09-28T20:06:07.743Z","event":"poll_waiting","description":"devops-g2-reconciliation-dlq-not-empty OK transition","elapsedMs":233913}
+{"ts":"2026-09-28T20:06:24.433Z","event":"poll_waiting","description":"devops-g2-reconciliation-dlq-not-empty OK transition","elapsedMs":250603}
+{"ts":"2026-09-28T20:06:41.020Z","event":"poll_waiting","description":"devops-g2-reconciliation-dlq-not-empty OK transition","elapsedMs":267190}
+{"ts":"2026-09-28T20:06:57.608Z","event":"poll_waiting","description":"devops-g2-reconciliation-dlq-not-empty OK transition","elapsedMs":283778}
+{"ts":"2026-09-28T20:07:14.337Z","event":"poll_waiting","description":"devops-g2-reconciliation-dlq-not-empty OK transition","elapsedMs":300507}
+{"ts":"2026-09-28T20:07:31.056Z","event":"poll_waiting","description":"devops-g2-reconciliation-dlq-not-empty OK transition","elapsedMs":317226}
+{"ts":"2026-09-28T20:07:47.661Z","event":"poll_waiting","description":"devops-g2-reconciliation-dlq-not-empty OK transition","elapsedMs":333831}
+{"ts":"2026-09-28T20:08:04.362Z","event":"poll_waiting","description":"devops-g2-reconciliation-dlq-not-empty OK transition","elapsedMs":350532}
+{"ts":"2026-09-28T20:08:20.944Z","event":"drill_assertion","step":6,"result":"pass","alarmTimestamp":"2026-09-28T23:08:08.975000+03:00","historySummary":"Alarm updated from ALARM to OK"}
+{"ts":"2026-09-28T20:08:22.566Z","event":"poll_waiting","description":"Slack notifier OK delivery log line","elapsedMs":1622}
+{"ts":"2026-09-28T20:08:39.683Z","event":"drill_assertion","step":7,"result":"pass","delivery":{"event":"alert_delivered","alarm":"devops-g2-reconciliation-dlq-not-empty","state":"OK"}}
+{"ts":"2026-09-28T20:08:39.684Z","event":"drill_completed","drill":"abandoned-payment","result":"pass"}

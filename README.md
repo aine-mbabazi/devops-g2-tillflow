@@ -101,14 +101,14 @@ holds no ongoing cost beyond negligible S3/DynamoDB storage.
 
 ## URLs
 
-- **API Gateway (public entry point):** https://exykmqaubj.execute-api.us-east-2.amazonaws.com/
+- **API Gateway (public entry point):** https://o71n13inq0.execute-api.us-east-2.amazonaws.com/
   (the `api_gateway_invoke_url` Terraform output; it changes if the gateway is
   recreated, so re-check it after a destroy/rebuild). All external traffic
   enters here and is forwarded over a VPC Link to the internal ALB.
 - **ALB (internal only, not internet-facing):**
   `internal-devops-g2-alb-853726153.us-east-2.elb.amazonaws.com`
   — reachable from within the VPC only; not accessible from the public internet.
-- **Payments health check:** https://exykmqaubj.execute-api.us-east-2.amazonaws.com/health
+- **Payments health check:** https://o71n13inq0.execute-api.us-east-2.amazonaws.com/health
 - **ECR repository:** `<account-id>.dkr.ecr.us-east-2.amazonaws.com/devops-g2/payments`
   (resolve `<account-id>` with `aws sts get-caller-identity --query Account --output text`)
 - **CloudWatch Logs:** `/devops-g2/payments`, `/devops-g2/pos`, `/devops-g2/commission`
@@ -235,19 +235,19 @@ which surfaced a missing apply-role permission fixed in PR #73
 (`s3:GetBucketAcl`). Once both merge and an apply succeeds, the canary
 becomes the largest line item in [Cost](#cost) above.
 
-**Not yet exercised:** a full `terraform destroy` + rebuild cycle for the
-*current* set of resources. A partial destroy did happen once earlier in the
-project (see the `devops-g2/slack-webhook` secret's pending-deletion
-incident in `evidence/reliability-operations/README.md`'s "Live alert
-delivery" section) — real evidence a destroy cycle occurred, but not a
-clean, complete, timed one against today's stack. Two known blockers if
-`terraform destroy` is run as-is, before any object/image cleanup:
-- None of the four S3 buckets in `infra/main` set `force_destroy = true`,
-  so a bucket holding any object (including old versions, since versioning
-  is on) will block its own destroy until emptied manually or the buckets
-  are given `force_destroy` first.
-- ECR repositories have no `force_delete` set either, so a non-empty
-  repository blocks the same way.
+**Now exercised (G5, 2026-09-28/29):** a full `terraform destroy` + rebuild
+cycle for the current 157-resource stack. Destroy: 12m05s. Rebuild to a
+confirmed live `200` at the new API Gateway URL: 46m50s, including
+diagnosing and fixing two real blockers hit along the way (stale S3
+`import` blocks left over from an earlier drift fix, and Secrets Manager's
+default pending-deletion window blocking secret recreation) and an RDS
+SSL-enforcement mismatch that needed an app-level fix, not a config
+workaround. Full timeline, every timing, and the honest caveats:
+[`evidence/reliability-operations/g5-destroy-rebuild.md`](evidence/reliability-operations/g5-destroy-rebuild.md).
+A manual RDS snapshot taken immediately before destroy preserves the
+pre-destroy data (the rebuilt instance itself is empty and freshly
+migrated, by design — this was a teardown drill, not a restore drill; see
+the G4 restore drill for that).
 
 RDS itself destroys cleanly with no manual snapshot step
 (`skip_final_snapshot = true`, `deletion_protection = false` in `rds.tf`).
