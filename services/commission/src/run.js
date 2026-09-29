@@ -31,7 +31,10 @@ async function main() {
   let pool;
   if (config.ledgerStore === 'postgres') {
     const { Pool } = await import('pg');
-    pool = new Pool({ connectionString: config.databaseUrl });
+    // RDS Postgres 16's default parameter group enforces rds.force_ssl; see
+    // services/pos/src/server.js for why rejectUnauthorized: false is used
+    // instead of an sslmode connection-string param.
+    pool = new Pool({ connectionString: config.databaseUrl, ssl: { rejectUnauthorized: false } });
     ledger = new PostgresCommissionLedger(pool);
   }
 

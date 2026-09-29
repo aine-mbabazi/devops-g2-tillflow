@@ -22,7 +22,13 @@ async function start() {
     let pool;
     if (config.posStore === 'postgres') {
       const { Pool } = await import('pg');
-      pool = new Pool({ connectionString: config.databaseUrl });
+      // RDS Postgres 16's default parameter group enforces rds.force_ssl;
+      // the connection string is deliberately left without a `sslmode` query
+      // param since pg's own parsing of that (as of pg 8.16) maps
+      // require/prefer/verify-ca to verify-full and then rejects RDS's
+      // certificate as self-signed. rejectUnauthorized: false gets an
+      // encrypted connection without needing the RDS CA bundle vendored in.
+      pool = new Pool({ connectionString: config.databaseUrl, ssl: { rejectUnauthorized: false } });
       saleStore = new PostgresSaleStore(pool);
       tenantStore = new PostgresTenantStore(pool);
     }
