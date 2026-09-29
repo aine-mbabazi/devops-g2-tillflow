@@ -1,0 +1,170 @@
+{
+  "drill": "devops-g2-restore",
+  "source": "devops-g2-db",
+  "target": "devops-g2-db-restore",
+  "started_utc": "2026-09-28T22:02:24.098Z",
+  "restore_point": "2026-09-28T21:54:21+00:00",
+  "available_utc": "2026-09-28T22:32:57.554Z",
+  "rto": {
+    "seconds": 1833,
+    "target_seconds": 1800,
+    "met": false
+  },
+  "rpo": {
+    "seconds": 483,
+    "target_seconds": 300,
+    "met": false
+  },
+  "reconciliation": {
+    "checked_at": "2026-09-28T22:33:34.060Z",
+    "row_counts": {
+      "payments": {
+        "live": 2162,
+        "restore": 2162,
+        "delta": 0
+      },
+      "payouts": {
+        "live": 0,
+        "restore": 0,
+        "delta": 0
+      }
+    },
+    "reconciliation": {
+      "payments": {
+        "pending_at_restore_point": 2162,
+        "method": "DARAJA_MODE=fake — re-queried against the live database's current record for each id, the fake-mode analog of re-querying the provider directly",
+        "resolved_since_restore_point_count": 0,
+        "unresolved_count": 2162,
+        "sample": [
+          {
+            "id": "payment_2c375808-d948-4f8c-ab66-5d8d34a7a34e",
+            "tenant_id": "load-tenant",
+            "status_at_restore_point": "pending",
+            "live_status_now": "pending",
+            "resolved_since_restore_point": false
+          },
+          {
+            "id": "payment_26c935e9-35d3-43f1-aa47-b7d060407b70",
+            "tenant_id": "load-tenant",
+            "status_at_restore_point": "pending",
+            "live_status_now": "pending",
+            "resolved_since_restore_point": false
+          },
+          {
+            "id": "payment_eb49277c-fa93-4643-8600-29ac1d182ac1",
+            "tenant_id": "load-tenant",
+            "status_at_restore_point": "pending",
+            "live_status_now": "pending",
+            "resolved_since_restore_point": false
+          },
+          {
+            "id": "payment_59e6af9f-2feb-4930-a6dd-9ea95427883a",
+            "tenant_id": "load-tenant",
+            "status_at_restore_point": "pending",
+            "live_status_now": "pending",
+            "resolved_since_restore_point": false
+          },
+          {
+            "id": "payment_a9f6d3c7-9178-46ea-a217-60de352bdaa7",
+            "tenant_id": "load-tenant",
+            "status_at_restore_point": "pending",
+            "live_status_now": "pending",
+            "resolved_since_restore_point": false
+          },
+          {
+            "id": "payment_68f7ec73-0179-4a85-9823-9db9345d4701",
+            "tenant_id": "load-tenant",
+            "status_at_restore_point": "pending",
+            "live_status_now": "pending",
+            "resolved_since_restore_point": false
+          },
+          {
+            "id": "payment_38b9d44c-6e8f-42ea-89e0-33fd9a638703",
+            "tenant_id": "load-tenant",
+            "status_at_restore_point": "pending",
+            "live_status_now": "pending",
+            "resolved_since_restore_point": false
+          },
+          {
+            "id": "payment_7724268a-caef-45a6-a4ef-2299a738c3f2",
+            "tenant_id": "load-tenant",
+            "status_at_restore_point": "pending",
+            "live_status_now": "pending",
+            "resolved_since_restore_point": false
+          },
+          {
+            "id": "payment_153c0fe3-b656-4f0d-b0a2-2fb40c5dc4db",
+            "tenant_id": "load-tenant",
+            "status_at_restore_point": "pending",
+            "live_status_now": "pending",
+            "resolved_since_restore_point": false
+          },
+          {
+            "id": "payment_0947f0ec-7d68-4584-9a40-102a4532db0e",
+            "tenant_id": "load-tenant",
+            "status_at_restore_point": "pending",
+            "live_status_now": "pending",
+            "resolved_since_restore_point": false
+          }
+        ]
+      },
+      "payouts": {
+        "pending_at_restore_point": 0,
+        "method": "DARAJA_MODE=fake — re-queried against the live database's current record for each id, the fake-mode analog of re-querying the provider directly",
+        "resolved_since_restore_point_count": 0,
+        "unresolved_count": 0,
+        "sample": []
+      }
+    },
+    "checks": [
+      {
+        "check": "payments row count captured on both instances",
+        "ok": true
+      },
+      {
+        "check": "payouts row count captured on both instances",
+        "ok": true
+      },
+      {
+        "check": "every payments record pending at the restore point was re-checked against live state",
+        "ok": true
+      },
+      {
+        "check": "every payouts record pending at the restore point was re-checked against live state",
+        "ok": true
+      }
+    ]
+  },
+  "live_after": {
+    "id": "devops-g2-db",
+    "status": "available",
+    "deletion_protection": false
+  },
+  "rewrote_live_from_restore": false,
+  "checks": [
+    {
+      "check": "restore landed in a new, separate instance",
+      "ok": true
+    },
+    {
+      "check": "RTO measured (started -> available)",
+      "ok": true
+    },
+    {
+      "check": "RPO measured (started - LatestRestorableTime at call)",
+      "ok": true
+    },
+    {
+      "check": "reconciliation step (runbook step 2) executed and captured",
+      "ok": true
+    },
+    {
+      "check": "restore instance deleted after capture",
+      "ok": true
+    },
+    {
+      "check": "live instance untouched throughout",
+      "ok": true
+    }
+  ]
+}

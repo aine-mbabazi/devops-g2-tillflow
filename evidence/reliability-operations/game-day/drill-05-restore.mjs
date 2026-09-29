@@ -141,7 +141,14 @@ async function main() {
       env: {
         ...process.env,
         CLUSTER, TASK_DEFINITION: PAYMENTS_SERVICE, CONTAINER_NAME: 'payments',
-        SUBNETS: netConfig.Subnets.join(','), SECURITY_GROUPS: netConfig.SecurityGroups.join(','),
+        // ECS's own JSON casing is camelCase-first-lowercase (subnets,
+        // securityGroups), not PascalCase like most EC2/RDS responses —
+        // confirmed live on 2026-09-28 after this line's original
+        // capitalized keys silently produced undefined, crashed on
+        // .join(','), and the catch below swallowed it into a "reconciliation
+        // failed" result while the restore instance was already being
+        // deleted in step 5.
+        SUBNETS: netConfig.subnets.join(','), SECURITY_GROUPS: netConfig.securityGroups.join(','),
         ENV_OVERRIDES: envOverrides, AWS_REGION: REGION,
       },
     });

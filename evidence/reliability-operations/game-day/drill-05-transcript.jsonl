@@ -1,0 +1,124 @@
+{"ts":"2026-09-28T22:02:21.763Z","event":"drill_started","drill":"restore","source":"devops-g2-db","target":"devops-g2-db-restore"}
+{"ts":"2026-09-28T22:02:24.098Z","event":"drill_step","step":1,"description":"captured source state","latestRestorableTime":"2026-09-28T21:54:21+00:00","sourceSg":"sg-0eca10397783cc6af","sourceStatus":"available","sourceDeletionProtection":false}
+{"ts":"2026-09-28T22:02:24.098Z","event":"drill_step","step":2,"description":"restoring devops-g2-db -> devops-g2-db-restore at latest restorable time"}
+{"ts":"2026-09-28T22:02:28.016Z","event":"drill_assertion","step":2,"result":"pass","startedAt":"2026-09-28T22:02:24.098Z","detail":"restore-db-instance-to-point-in-time issued"}
+{"ts":"2026-09-28T22:02:28.017Z","event":"drill_step","step":3,"description":"waiting for devops-g2-db-restore to become available"}
+{"ts":"2026-09-28T22:02:30.206Z","event":"restore_status","status":"creating"}
+{"ts":"2026-09-28T22:02:30.206Z","event":"poll_waiting","description":"devops-g2-db-restore status == available","elapsedMs":2189}
+{"ts":"2026-09-28T22:03:02.586Z","event":"restore_status","status":"creating"}
+{"ts":"2026-09-28T22:03:02.586Z","event":"poll_waiting","description":"devops-g2-db-restore status == available","elapsedMs":34569}
+{"ts":"2026-09-28T22:03:34.888Z","event":"restore_status","status":"creating"}
+{"ts":"2026-09-28T22:03:34.888Z","event":"poll_waiting","description":"devops-g2-db-restore status == available","elapsedMs":66871}
+{"ts":"2026-09-28T22:04:07.235Z","event":"restore_status","status":"creating"}
+{"ts":"2026-09-28T22:04:07.235Z","event":"poll_waiting","description":"devops-g2-db-restore status == available","elapsedMs":99218}
+{"ts":"2026-09-28T22:04:39.561Z","event":"restore_status","status":"creating"}
+{"ts":"2026-09-28T22:04:39.561Z","event":"poll_waiting","description":"devops-g2-db-restore status == available","elapsedMs":131544}
+{"ts":"2026-09-28T22:05:12.047Z","event":"restore_status","status":"creating"}
+{"ts":"2026-09-28T22:05:12.047Z","event":"poll_waiting","description":"devops-g2-db-restore status == available","elapsedMs":164030}
+{"ts":"2026-09-28T22:05:44.482Z","event":"restore_status","status":"creating"}
+{"ts":"2026-09-28T22:05:44.483Z","event":"poll_waiting","description":"devops-g2-db-restore status == available","elapsedMs":196466}
+{"ts":"2026-09-28T22:06:16.845Z","event":"restore_status","status":"creating"}
+{"ts":"2026-09-28T22:06:16.846Z","event":"poll_waiting","description":"devops-g2-db-restore status == available","elapsedMs":228829}
+{"ts":"2026-09-28T22:06:49.103Z","event":"restore_status","status":"creating"}
+{"ts":"2026-09-28T22:06:49.103Z","event":"poll_waiting","description":"devops-g2-db-restore status == available","elapsedMs":261086}
+{"ts":"2026-09-28T22:07:21.431Z","event":"restore_status","status":"creating"}
+{"ts":"2026-09-28T22:07:21.431Z","event":"poll_waiting","description":"devops-g2-db-restore status == available","elapsedMs":293414}
+{"ts":"2026-09-28T22:07:53.800Z","event":"restore_status","status":"creating"}
+{"ts":"2026-09-28T22:07:53.801Z","event":"poll_waiting","description":"devops-g2-db-restore status == available","elapsedMs":325784}
+{"ts":"2026-09-28T22:08:26.150Z","event":"restore_status","status":"creating"}
+{"ts":"2026-09-28T22:08:26.150Z","event":"poll_waiting","description":"devops-g2-db-restore status == available","elapsedMs":358133}
+{"ts":"2026-09-28T22:08:58.595Z","event":"restore_status","status":"creating"}
+{"ts":"2026-09-28T22:08:58.596Z","event":"poll_waiting","description":"devops-g2-db-restore status == available","elapsedMs":390579}
+{"ts":"2026-09-28T22:09:31.008Z","event":"restore_status","status":"creating"}
+{"ts":"2026-09-28T22:09:31.008Z","event":"poll_waiting","description":"devops-g2-db-restore status == available","elapsedMs":422991}
+{"ts":"2026-09-28T22:10:03.365Z","event":"restore_status","status":"creating"}
+{"ts":"2026-09-28T22:10:03.365Z","event":"poll_waiting","description":"devops-g2-db-restore status == available","elapsedMs":455348}
+{"ts":"2026-09-28T22:10:35.684Z","event":"restore_status","status":"creating"}
+{"ts":"2026-09-28T22:10:35.684Z","event":"poll_waiting","description":"devops-g2-db-restore status == available","elapsedMs":487667}
+{"ts":"2026-09-28T22:11:13.120Z","event":"restore_status","status":"creating"}
+{"ts":"2026-09-28T22:11:13.120Z","event":"poll_waiting","description":"devops-g2-db-restore status == available","elapsedMs":525103}
+{"ts":"2026-09-28T22:11:45.480Z","event":"restore_status","status":"creating"}
+{"ts":"2026-09-28T22:11:45.481Z","event":"poll_waiting","description":"devops-g2-db-restore status == available","elapsedMs":557464}
+{"ts":"2026-09-28T22:12:17.776Z","event":"restore_status","status":"creating"}
+{"ts":"2026-09-28T22:12:17.776Z","event":"poll_waiting","description":"devops-g2-db-restore status == available","elapsedMs":589759}
+{"ts":"2026-09-28T22:12:50.069Z","event":"restore_status","status":"configuring-enhanced-monitoring"}
+{"ts":"2026-09-28T22:12:50.069Z","event":"poll_waiting","description":"devops-g2-db-restore status == available","elapsedMs":622052}
+{"ts":"2026-09-28T22:13:22.424Z","event":"restore_status","status":"configuring-enhanced-monitoring"}
+{"ts":"2026-09-28T22:13:22.424Z","event":"poll_waiting","description":"devops-g2-db-restore status == available","elapsedMs":654407}
+{"ts":"2026-09-28T22:13:54.742Z","event":"restore_status","status":"backing-up"}
+{"ts":"2026-09-28T22:13:54.742Z","event":"poll_waiting","description":"devops-g2-db-restore status == available","elapsedMs":686725}
+{"ts":"2026-09-28T22:14:27.330Z","event":"restore_status","status":"backing-up"}
+{"ts":"2026-09-28T22:14:27.330Z","event":"poll_waiting","description":"devops-g2-db-restore status == available","elapsedMs":719313}
+{"ts":"2026-09-28T22:14:59.713Z","event":"restore_status","status":"backing-up"}
+{"ts":"2026-09-28T22:14:59.714Z","event":"poll_waiting","description":"devops-g2-db-restore status == available","elapsedMs":751697}
+{"ts":"2026-09-28T22:15:32.113Z","event":"restore_status","status":"backing-up"}
+{"ts":"2026-09-28T22:15:32.114Z","event":"poll_waiting","description":"devops-g2-db-restore status == available","elapsedMs":784097}
+{"ts":"2026-09-28T22:16:04.420Z","event":"restore_status","status":"backing-up"}
+{"ts":"2026-09-28T22:16:04.420Z","event":"poll_waiting","description":"devops-g2-db-restore status == available","elapsedMs":816403}
+{"ts":"2026-09-28T22:16:36.745Z","event":"restore_status","status":"backing-up"}
+{"ts":"2026-09-28T22:16:36.745Z","event":"poll_waiting","description":"devops-g2-db-restore status == available","elapsedMs":848728}
+{"ts":"2026-09-28T22:17:09.086Z","event":"restore_status","status":"backing-up"}
+{"ts":"2026-09-28T22:17:09.086Z","event":"poll_waiting","description":"devops-g2-db-restore status == available","elapsedMs":881069}
+{"ts":"2026-09-28T22:17:41.304Z","event":"restore_status","status":"backing-up"}
+{"ts":"2026-09-28T22:17:41.304Z","event":"poll_waiting","description":"devops-g2-db-restore status == available","elapsedMs":913287}
+{"ts":"2026-09-28T22:18:13.864Z","event":"restore_status","status":"backing-up"}
+{"ts":"2026-09-28T22:18:13.864Z","event":"poll_waiting","description":"devops-g2-db-restore status == available","elapsedMs":945847}
+{"ts":"2026-09-28T22:18:46.278Z","event":"restore_status","status":"backing-up"}
+{"ts":"2026-09-28T22:18:46.278Z","event":"poll_waiting","description":"devops-g2-db-restore status == available","elapsedMs":978261}
+{"ts":"2026-09-28T22:19:18.593Z","event":"restore_status","status":"backing-up"}
+{"ts":"2026-09-28T22:19:18.593Z","event":"poll_waiting","description":"devops-g2-db-restore status == available","elapsedMs":1010576}
+{"ts":"2026-09-28T22:19:50.861Z","event":"restore_status","status":"backing-up"}
+{"ts":"2026-09-28T22:19:50.861Z","event":"poll_waiting","description":"devops-g2-db-restore status == available","elapsedMs":1042844}
+{"ts":"2026-09-28T22:20:23.156Z","event":"restore_status","status":"backing-up"}
+{"ts":"2026-09-28T22:20:23.156Z","event":"poll_waiting","description":"devops-g2-db-restore status == available","elapsedMs":1075139}
+{"ts":"2026-09-28T22:20:55.594Z","event":"restore_status","status":"backing-up"}
+{"ts":"2026-09-28T22:20:55.594Z","event":"poll_waiting","description":"devops-g2-db-restore status == available","elapsedMs":1107577}
+{"ts":"2026-09-28T22:21:28.038Z","event":"restore_status","status":"backing-up"}
+{"ts":"2026-09-28T22:21:28.039Z","event":"poll_waiting","description":"devops-g2-db-restore status == available","elapsedMs":1140022}
+{"ts":"2026-09-28T22:22:00.518Z","event":"restore_status","status":"backing-up"}
+{"ts":"2026-09-28T22:22:00.519Z","event":"poll_waiting","description":"devops-g2-db-restore status == available","elapsedMs":1172502}
+{"ts":"2026-09-28T22:22:32.780Z","event":"restore_status","status":"backing-up"}
+{"ts":"2026-09-28T22:22:32.780Z","event":"poll_waiting","description":"devops-g2-db-restore status == available","elapsedMs":1204763}
+{"ts":"2026-09-28T22:23:05.101Z","event":"restore_status","status":"backing-up"}
+{"ts":"2026-09-28T22:23:05.101Z","event":"poll_waiting","description":"devops-g2-db-restore status == available","elapsedMs":1237084}
+{"ts":"2026-09-28T22:23:42.514Z","event":"restore_status","status":"backing-up"}
+{"ts":"2026-09-28T22:23:42.514Z","event":"poll_waiting","description":"devops-g2-db-restore status == available","elapsedMs":1274497}
+{"ts":"2026-09-28T22:24:14.862Z","event":"restore_status","status":"backing-up"}
+{"ts":"2026-09-28T22:24:14.863Z","event":"poll_waiting","description":"devops-g2-db-restore status == available","elapsedMs":1306846}
+{"ts":"2026-09-28T22:24:47.177Z","event":"restore_status","status":"backing-up"}
+{"ts":"2026-09-28T22:24:47.177Z","event":"poll_waiting","description":"devops-g2-db-restore status == available","elapsedMs":1339160}
+{"ts":"2026-09-28T22:25:19.482Z","event":"restore_status","status":"backing-up"}
+{"ts":"2026-09-28T22:25:19.482Z","event":"poll_waiting","description":"devops-g2-db-restore status == available","elapsedMs":1371465}
+{"ts":"2026-09-28T22:25:51.788Z","event":"restore_status","status":"backing-up"}
+{"ts":"2026-09-28T22:25:51.788Z","event":"poll_waiting","description":"devops-g2-db-restore status == available","elapsedMs":1403771}
+{"ts":"2026-09-28T22:26:24.115Z","event":"restore_status","status":"backing-up"}
+{"ts":"2026-09-28T22:26:24.115Z","event":"poll_waiting","description":"devops-g2-db-restore status == available","elapsedMs":1436098}
+{"ts":"2026-09-28T22:26:56.392Z","event":"restore_status","status":"backing-up"}
+{"ts":"2026-09-28T22:26:56.392Z","event":"poll_waiting","description":"devops-g2-db-restore status == available","elapsedMs":1468375}
+{"ts":"2026-09-28T22:27:28.669Z","event":"restore_status","status":"backing-up"}
+{"ts":"2026-09-28T22:27:28.669Z","event":"poll_waiting","description":"devops-g2-db-restore status == available","elapsedMs":1500652}
+{"ts":"2026-09-28T22:28:06.028Z","event":"restore_status","status":"backing-up"}
+{"ts":"2026-09-28T22:28:06.028Z","event":"poll_waiting","description":"devops-g2-db-restore status == available","elapsedMs":1538011}
+{"ts":"2026-09-28T22:28:38.345Z","event":"restore_status","status":"backing-up"}
+{"ts":"2026-09-28T22:28:38.346Z","event":"poll_waiting","description":"devops-g2-db-restore status == available","elapsedMs":1570329}
+{"ts":"2026-09-28T22:29:10.853Z","event":"restore_status","status":"backing-up"}
+{"ts":"2026-09-28T22:29:10.853Z","event":"poll_waiting","description":"devops-g2-db-restore status == available","elapsedMs":1602836}
+{"ts":"2026-09-28T22:29:43.214Z","event":"restore_status","status":"backing-up"}
+{"ts":"2026-09-28T22:29:43.214Z","event":"poll_waiting","description":"devops-g2-db-restore status == available","elapsedMs":1635197}
+{"ts":"2026-09-28T22:30:15.802Z","event":"restore_status","status":"backing-up"}
+{"ts":"2026-09-28T22:30:15.802Z","event":"poll_waiting","description":"devops-g2-db-restore status == available","elapsedMs":1667785}
+{"ts":"2026-09-28T22:30:48.100Z","event":"restore_status","status":"backing-up"}
+{"ts":"2026-09-28T22:30:48.100Z","event":"poll_waiting","description":"devops-g2-db-restore status == available","elapsedMs":1700083}
+{"ts":"2026-09-28T22:31:20.425Z","event":"restore_status","status":"backing-up"}
+{"ts":"2026-09-28T22:31:20.425Z","event":"poll_waiting","description":"devops-g2-db-restore status == available","elapsedMs":1732408}
+{"ts":"2026-09-28T22:31:52.693Z","event":"restore_status","status":"modifying"}
+{"ts":"2026-09-28T22:31:52.694Z","event":"poll_waiting","description":"devops-g2-db-restore status == available","elapsedMs":1764677}
+{"ts":"2026-09-28T22:32:25.133Z","event":"restore_status","status":"modifying"}
+{"ts":"2026-09-28T22:32:25.133Z","event":"poll_waiting","description":"devops-g2-db-restore status == available","elapsedMs":1797116}
+{"ts":"2026-09-28T22:32:57.554Z","event":"restore_status","status":"available"}
+{"ts":"2026-09-28T22:33:04.847Z","event":"drill_assertion","step":3,"result":"pass","availableAt":"2026-09-28T22:32:57.554Z","endpoint":"devops-g2-db-restore.cxwaioocu1ls.us-east-2.rds.amazonaws.com"}
+{"ts":"2026-09-28T22:33:04.847Z","event":"drill_step","step":4,"description":"running verify-restore.mjs inside the VPC via run-in-vpc.sh"}
+{"ts":"2026-09-28T22:34:34.058Z","event":"drill_assertion","step":4,"result":"pass","reconciliation":{"checked_at":"2026-09-28T22:33:34.060Z","row_counts":{"payments":{"live":2162,"restore":2162,"delta":0},"payouts":{"live":0,"restore":0,"delta":0}},"reconciliation":{"payments":{"pending_at_restore_point":2162,"method":"DARAJA_MODE=fake — re-queried against the live database's current record for each id, the fake-mode analog of re-querying the provider directly","resolved_since_restore_point_count":0,"unresolved_count":2162,"sample":[{"id":"payment_2c375808-d948-4f8c-ab66-5d8d34a7a34e","tenant_id":"load-tenant","status_at_restore_point":"pending","live_status_now":"pending","resolved_since_restore_point":false},{"id":"payment_26c935e9-35d3-43f1-aa47-b7d060407b70","tenant_id":"load-tenant","status_at_restore_point":"pending","live_status_now":"pending","resolved_since_restore_point":false},{"id":"payment_eb49277c-fa93-4643-8600-29ac1d182ac1","tenant_id":"load-tenant","status_at_restore_point":"pending","live_status_now":"pending","resolved_since_restore_point":false},{"id":"payment_59e6af9f-2feb-4930-a6dd-9ea95427883a","tenant_id":"load-tenant","status_at_restore_point":"pending","live_status_now":"pending","resolved_since_restore_point":false},{"id":"payment_a9f6d3c7-9178-46ea-a217-60de352bdaa7","tenant_id":"load-tenant","status_at_restore_point":"pending","live_status_now":"pending","resolved_since_restore_point":false},{"id":"payment_68f7ec73-0179-4a85-9823-9db9345d4701","tenant_id":"load-tenant","status_at_restore_point":"pending","live_status_now":"pending","resolved_since_restore_point":false},{"id":"payment_38b9d44c-6e8f-42ea-89e0-33fd9a638703","tenant_id":"load-tenant","status_at_restore_point":"pending","live_status_now":"pending","resolved_since_restore_point":false},{"id":"payment_7724268a-caef-45a6-a4ef-2299a738c3f2","tenant_id":"load-tenant","status_at_restore_point":"pending","live_status_now":"pending","resolved_since_restore_point":false},{"id":"payment_153c0fe3-b656-4f0d-b0a2-2fb40c5dc4db","tenant_id":"load-tenant","status_at_restore_point":"pending","live_status_now":"pending","resolved_since_restore_point":false},{"id":"payment_0947f0ec-7d68-4584-9a40-102a4532db0e","tenant_id":"load-tenant","status_at_restore_point":"pending","live_status_now":"pending","resolved_since_restore_point":false}]},"payouts":{"pending_at_restore_point":0,"method":"DARAJA_MODE=fake — re-queried against the live database's current record for each id, the fake-mode analog of re-querying the provider directly","resolved_since_restore_point_count":0,"unresolved_count":0,"sample":[]}},"checks":[{"check":"payments row count captured on both instances","ok":true},{"check":"payouts row count captured on both instances","ok":true},{"check":"every payments record pending at the restore point was re-checked against live state","ok":true},{"check":"every payouts record pending at the restore point was re-checked against live state","ok":true}]}}
+{"ts":"2026-09-28T22:34:34.059Z","event":"drill_step","step":5,"description":"deleting devops-g2-db-restore"}
+{"ts":"2026-09-28T22:34:38.607Z","event":"drill_assertion","step":5,"result":"pass","liveStatusAfter":"available","deletionProtectionIntact":false}
+{"ts":"2026-09-28T22:34:38.608Z","event":"drill_completed","drill":"restore","result":"executed, see summary for target misses","rtoSeconds":1833,"rpoSeconds":483}
