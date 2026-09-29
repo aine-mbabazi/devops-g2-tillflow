@@ -4,6 +4,12 @@ DRI: @aine-mbabazi (Platform + delivery). First full `terraform destroy` +
 rebuild cycle for this stack's current resource set — the README's own
 "Not yet exercised" line for this is now closed.
 
+**⚠️ Merge PR #105 before any other open PR that touches `services/`.** The
+pos, payments, commission, and web images currently running in production
+were built from this PR's tree — including the `imports.tf` removal and
+the `ssl: { rejectUnauthorized: false }` fix below. Merging something else
+first risks `main` diverging from what's actually deployed.
+
 ## Timeline (UTC)
 
 | Time | Event |
@@ -45,10 +51,23 @@ rebuild cycle for this stack's current resource set — the README's own
 2. **Secrets Manager pending-deletion on destroy** — `aws_secretsmanager_secret_version.database_url`/`service_auth`/`slack_webhook` all use `ignore_changes = [secret_string]`, but the secret resources themselves have no `recovery_window_in_days = 0`, so `terraform destroy` leaves them soft-deleted for AWS's default recovery window, blocking any rebuild until manually purged. **Same failure class already recorded once in `docs/scar-log.md` (2026-09-20)** — worth fixing at the source (`recovery_window_in_days = 0` on all three) so the next teardown doesn't need this manual step again. *Not fixed in this PR* — flagged here for a follow-up, given the time budget.
 3. **RDS SSL enforcement with no app-side SSL support** — every service's `pg.Pool` construction (3 `server.js`/`run.js`, 3 `migrate.js`) assumed a plaintext connection would be accepted. The original (destroyed) instance apparently never exercised this — either an AWS default changed, or the original instance carried an undocumented custom parameter group. Fixed at the app layer with `ssl: { rejectUnauthorized: false }`, not by disabling RDS's own enforcement — the more secure fix, not the faster one that happened to also be available.
 
+   **This is a known trade-off, not a finished fix.** `rejectUnauthorized: false` gets an *encrypted* connection — traffic to RDS is no longer plaintext — but it does **not** verify the server certificate, so it is not protected against a machine-in-the-middle presenting a different cert within the VPC. The honest state is "encrypted, not authenticated." **Follow-up:** load the RDS CA bundle (`AmazonRootCA1`/the regional RDS CA cert) into the image and pass it as `ssl: { ca: <bundle>, rejectUnauthorized: true }`, verifying the server identity properly instead of skipping the check.
+
 ## Honest caveats
 
 - **The manual pre-destroy RDS snapshot is tagged `managed-by=terraform`, which is not literally true** — it was created out-of-band via the AWS CLI, not by Terraform. Done to satisfy `scripts/audit-tags.sh`'s hardcoded expectation (no exemption mechanism exists for legitimately-manual resources). The snapshot's real provenance is this document and `docs/scar-log.md`, not its tags.
 - **The Secrets Manager `recovery_window_in_days` gap (defect 2 above) is not fixed in this PR** — only worked around locally (force-purge) to unblock tonight's rebuild. A future destroy will hit it again until `secrets.tf` is updated.
 - **RDS data is not the same as before the destroy.** The manual snapshot preserves the pre-destroy state if it's ever needed, but the live instance was rebuilt empty and freshly migrated — this was a deliberate demo-environment teardown, not a disaster-recovery restore (see drill 5 for that scenario instead).
 - **`devops-g2/slack-webhook` is live but empty** post-rebuild (Terraform never versions it, by design). Alerts will not reach Slack until the real webhook URL is populated — command given to @aine-mbabazi to run directly, not run by this evidence pass.
-- Web and Commission were rebuilt/redeployed but not independently smoke-tested beyond a healthy target group (web) and a clean migration run (commission) — the daily Commission close itself was not triggered as part of this pass.
+- Web was rebuilt/redeployed but not independently smoke-tested beyond a healthy target group (it has no HTTP routes exercised by `smoke.js`).
+
+## Post-rebuild verification, before the 02:00 UTC scheduled close
+
+Run separately, ~15 minutes after the rebuild, to confirm Commission specifically before its first real scheduled invocation:
+
+- Latest task definition (revision 14): correct image digest, `TENANT_IDS=load-tenant`, all three `OTEL_*` vars, 6 tags (audit-confirmed correct for this resource type — task definition ARNs already carry the `devops-g2-` prefix, so `scripts/audit-tags.sh`'s `Name`-tag fallback check doesn't apply here).
+- Confirmed the pushed image itself (not just the source tree) contains the SSL fix: `docker run --rm --entrypoint cat <image>@<digest> src/run.js` shows `ssl: { rejectUnauthorized: false }` directly.
+- Confirmed `commission.ledger_entries` exists on the new RDS instance (migration applied) via a one-off VPC query.
+- Ran one real close (`aws ecs run-task --task-definition devops-g2-commission`): `daily_close_started` → `daily_close_completed`, `payoutCount: 0` (expected — nothing has reached `paid` in `DARAJA_MODE=fake`), **exit code 0**. `commissionRunId: "close:2026-09-29"` — derived from the UTC date, so the real 02:00 UTC scheduled run reuses the same idempotency key and cannot double-run today's close.
+- Synthetic probe re-confirmed: `PROBE_BASE_URL` points at the new API Gateway URL, and CloudWatch shows one invocation per minute for the last 10 minutes (10/10).
+- `scripts/audit-tags.sh` re-run clean: `PASS — 115 resources, no naming or tagging violations`.
