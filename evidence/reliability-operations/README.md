@@ -581,3 +581,35 @@ or different stability check) are in `docs/scar-log.md`.
 
 Revert of the intentional break: `services/pos/src/app.js` and
 `services/pos/test/pos.test.js` in this PR.
+
+## Game day — drill 6, 2026-09-28 (executed, pass)
+
+Abandoned payment / DLQ recovery, against the deployed stack — never run
+before this pass. Created one real payment over the real API Gateway
+(tenant `load-tenant`) and deliberately withheld its callback.
+
+Two real defects surfaced getting this to run, both fixed in the same pass
+rather than worked around — full detail in
+[`game-day/drill-06-README.md`](game-day/drill-06-README.md):
+
+1. The original claim that an abandoned payment reaches the reconciliation
+   queue "through nothing but ordinary API calls" was **wrong**: `app.js`
+   only enqueues on a dispatch *failure*, and `FakeDarajaClient` never
+   fails. Fixed by manually seeding the real queue with the message
+   `app.js` itself would send — a documented substitution, not a
+   `set-alarm-state` shortcut. Everything after that injection point (real
+   consumer, real redelivery, real DLQ, real alarm, real Slack) is genuine.
+2. `tryParse()` broke on CloudWatch's Lambda-console log format (a
+   `<timestamp>\t<requestId>\t<level>\t` prefix before the JSON payload),
+   so the live Slack-delivery confirmation timed out even though delivery
+   had genuinely happened 8 seconds after the alarm fired. Fixed by
+   slicing to the first `{` before parsing — **and the identical bug was
+   fixed in `drill-03-platform-failure.mjs` before it could waste the same
+   10 minutes there too.**
+
+**Result:** alarm fired for real at 19:36:09Z, Slack delivered the firing
+alert, the DLQ message was confirmed and deleted per
+`docs/runbook.md#reconciliation-dlq` (not redriven — permanently
+unresolvable in `DARAJA_MODE=fake`), the alarm recovered to `OK` 5m55s
+after the fix (consistent with its 5-minute evaluation period), and Slack
+delivered the recovery alert. All 7 checks in `g3-alarm-firing.json` pass.
