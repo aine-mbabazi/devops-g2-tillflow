@@ -5,7 +5,7 @@ import pg from 'pg';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const dir = join(here, '..', 'migrations');
-const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
 
 try {
   const files = (await readdir(dir)).filter((f) => f.endsWith('.sql')).sort();
